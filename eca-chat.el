@@ -58,8 +58,17 @@
 
 ;; Internal
 
-(defvar-local eca--chat-history '(""))
+(defvar-local eca--chat-history '())
 (defvar-local eca--chat-history-index 0)
+
+(defun eca-chat--clear ()
+  "Clear the chat."
+  (with-current-buffer (eca--chat-get-or-create-buffer)
+    (let ((prompt (save-excursion
+                    (goto-char (point-max))
+                    (search-backward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
+                    (goto-char (1- (point))))))
+      (delete-region (point-min) prompt))))
 
 (defun eca-chat--prompt-prefix ()
   "The full chat prompt prefix."
@@ -102,7 +111,8 @@ This is similar to `backward-delete-char' but protects the prompt line."
                   (forward-char (length (eca-chat--prompt-prefix)))
                   (string-trim (buffer-substring-no-properties (point) (point-max))))))
     (unless (string-empty-p prompt)
-      (setcdr eca--chat-history (cons prompt (cdr eca--chat-history)))
+      (when (seq-empty-p eca--chat-history) (eca-chat--clear))
+      (add-to-list 'eca--chat-history prompt)
       (setq eca--chat-history-index 0)
 
       (goto-char (point-max)) ;; Go to end before searching back
@@ -113,6 +123,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
        :method "chat/prompt"
        :params (list :message prompt)
        :success-callback (-lambda (res)
+
                            ;; TODO
                            )))))
 
@@ -125,11 +136,13 @@ This is similar to `backward-delete-char' but protects the prompt line."
   (setq-local mode-line-format '())
   (visual-line-mode)
   (use-local-map eca-chat-mode-map)
+  (setq-local eca--chat-history '())
+  (setq-local eca--chat-history-index 0)
   (save-excursion
     (goto-char (point-min))
     (unless (search-forward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
       (insert "\n")
-      (insert (propertize "Welcome to ECA! What you have in mind?\n\n"
+      (insert (propertize (eca--session-chat-welcome-message eca--session)
                           'face 'eca-chat-welcome-face))
       (insert (propertize eca-chat-prompt-prefix 'face 'eca-chat-prompt-prefix-face))
       (insert (propertize eca-chat-prompt-separator 'face 'eca-chat-user-messages-face))))
@@ -154,6 +167,15 @@ This is similar to `backward-delete-char' but protects the prompt line."
     (select-window (get-buffer-window buffer))
     (set-window-buffer (get-buffer-window buffer) buffer)))
 
+(defun eca--chat-add-content (content)
+  "Add CONTENT to the chat."
+  (with-current-buffer (eca--chat-get-or-create-buffer)
+    (save-excursion
+      (goto-char (point-max))
+      (goto-char (line-beginning-position))
+      (goto-char (1- (point)))
+      (insert content))))
+
 ;; Public
 
 (defun eca-chat-content-received (params)
@@ -163,21 +185,20 @@ This is similar to `backward-delete-char' but protects the prompt line."
          (content (plist-get params :content))
          (type (plist-get content :type))
          (text (plist-get content :text)))
-    (when is-complete?
-      (setq-local mode-line-format '()))
     (pcase type
-      ("text" (when text
-                (with-current-buffer (eca--chat-get-or-create-buffer)
-                  (save-excursion
-                    (goto-char (point-max))
-                    (goto-char (line-beginning-position))
-                    (goto-char (1- (point)))
-                    (pcase role
-                      ("user" (insert (propertize text
-                                                  'face 'eca-chat-user-messages-face
-                                                  'line-prefix (propertize (eca-chat--prompt-prefix) 'face 'eca-chat-user-messages-face)
-                                                  'line-spacing 10)))
-                      (default (insert text)))))))
+      ("text" (progn
+                (when is-complete?
+                  (eca--chat-add-content (propertize "\n" 'line-spacing 10))
+                  (setq-local mode-line-format '()))
+                (when text
+                  (eca--chat-add-content
+                   (pcase role
+                     ("user" (propertize text
+                                         'face 'eca-chat-user-messages-face
+                                         'line-prefix (propertize (eca-chat--prompt-prefix) 'face 'eca-chat-user-messages-face)
+                                         'line-spacing 10))
+                     (default (propertize text
+                                          'line-height 20)))))))
       ("temporary-text" (setq-local mode-line-format `(,(propertize text 'face 'eca-chat-system-messages-face)))))))
 
 (defun eca-chat-open ()
@@ -199,6 +220,12 @@ This is similar to `backward-delete-char' but protects the prompt line."
     (insert "*Closed session*")
     (read-only-mode)
     (rename-buffer (concat (buffer-name) ":closed"))))
+
+;;;###autoload
+(defun eca-chat-clear ()
+  "Clear the eca chat."
+  (interactive)
+  (eca-chat--clear))
 
 (provide 'eca-chat)
 ;;; eca-chat.el ends here

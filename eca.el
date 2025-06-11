@@ -222,6 +222,8 @@ If not provided, download and start eca automatically."
                                                                 (eca--session-workspace-folders eca--session))))
                  :success-callback (-lambda (res)
                                      (setf (eca--session-status eca--session) 'started)
+                                     (setf (eca--session-chat-welcome-message eca--session) (plist-get res :chatWelcomeMessage))
+                                     (setf (eca--session-models eca--session) (plist-get res :models))
                                      (eca-info "Started!")
                                      (eca-chat-open)
                                      (with-current-buffer (get-buffer "*eca-chat*")

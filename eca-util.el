@@ -35,17 +35,24 @@
   (chat nil)
 
   ;; A list of workspace folders of this session
-  (workspace-folders nil)
+  (workspace-folders '())
 
   ;; A plist of request method names (strings) -> handlers used when
   ;; receiving requests from server.
-  (request-handlers nil)
+  (request-handlers '())
 
   ;; A plist of client request ids -> handlers for pending requests used when
   ;; receiving responses from server.
-  (response-handlers nil))
+  (response-handlers '())
+
+  ;; The suported models by the server.
+  (models '())
+
+  ;; The welcome message for new chats.
+  (chat-welcome-message ""))
 
 (defun eca-create-session ()
+  "Create a new ECA session."
   (let ((session (make-eca--session)))
     (setf (eca--session-workspace-folders session) (list (eca--project-root)))
     session))
