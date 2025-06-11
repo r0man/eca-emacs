@@ -25,6 +25,9 @@
 (defvar eca--session nil)
 
 (cl-defstruct eca--session
+  ;; The status of this session
+  (status 'stopped)
+
   ;; The eca <process>
   (process nil)
 
@@ -33,10 +36,6 @@
 
   ;; A list of workspace folders of this session
   (workspace-folders nil)
-
-  ;; A plist of notification method names (strings) -> handlers used when
-  ;; receiving notifications from server.
-  (notification-handlers nil)
 
   ;; A plist of request method names (strings) -> handlers used when
   ;; receiving requests from server.

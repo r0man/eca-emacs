@@ -84,18 +84,18 @@ If not provided, download and start eca automatically."
                  nil (format "Invalid Content-Length value: %s" val)))
     (cons key val)))
 
-(setq a (make-hash-table :test 'equal))
+(defun eca--handle-server-notification (notification)
+  "Handle NOTIFICATION sent by server."
+  (let ((method (plist-get notification :method))
+        (params (plist-get notification :params)))
+    (pcase method
+      ("chat/contentReceived" (eca-chat-content-received params))
+      (unknown (eca-warn "Unknown notification %s" method)))))
 
-(puthash 2 :foo a)
-(gethash 2 a)
-(remhash 2 a)
-
-(setq b nil)
-
-(plist-put! b 2 :foo)
-(plist-put! b 3 :bar)
-(plist-get b 2)
-(cl-remf b 2)
+(defun eca--handle-server-request (request)
+  "Handle REQUEST sent by server."
+  ;; TODO
+  )
 
 (defun eca--handle-message (json-data)
   "Handle raw message JSON-DATA."
@@ -106,9 +106,12 @@ If not provided, download and start eca automatically."
                    (when success-callback
                      (cl-remf (eca--session-response-handlers eca--session) id)
                      (funcall success-callback result))))
-      ('response-error ())
-      ('notification ())
-      ('request ()))))
+      ('response-error (-let [(_ error-callback) (plist-get (eca--session-response-handlers eca--session) id)]
+                         (when error-callback
+                           (cl-remf (eca--session-response-handlers eca--session) id)
+                           (funcall error-callback (plist-get json-data :error)))))
+      ('notification (eca--handle-server-notification json-data))
+      ('request (eca--handle-server-request json-data)))))
 
 (defun eca--process-filter (_proc raw-output)
   "The process filter to parse eca's stdout RAW-OUTPUT."
@@ -204,19 +207,31 @@ If not provided, download and start eca automatically."
 (defun eca--initialize ()
   "Sent the initialize request."
   (run-hooks 'eca-before-initialize-hook)
-  (eca-api-request-async
-   :method "initialize"
-   :params (list :processId (emacs-pid)
-                 :clientInfo (list :name "emacs"
-                                   :version (emacs-version))
-                 :capabilities (list :codeAssistant (list :chat t))
-                 :workspaceFolders (vconcat (-map (lambda (folder)
-                                                    (list :uri (eca--path-to-uri folder)
-                                                          :name (file-name-nondirectory (directory-file-name folder))))
-                                                  (eca--session-workspace-folders eca--session))))
-   :success-callback (-lambda (res)
-                       (eca-chat-open)
-                       (run-hooks 'eca-after-initialize-hook))))
+  (pcase (eca--session-status eca--session)
+    ('stopped (progn
+                (setf (eca--session-status eca--session) 'starting)
+                (eca-api-request-async
+                 :method "initialize"
+                 :params (list :processId (emacs-pid)
+                               :clientInfo (list :name "emacs"
+                                                 :version (emacs-version))
+                               :capabilities (list :codeAssistant (list :chat t))
+                               :workspaceFolders (vconcat (-map (lambda (folder)
+                                                                  (list :uri (eca--path-to-uri folder)
+                                                                        :name (file-name-nondirectory (directory-file-name folder))))
+                                                                (eca--session-workspace-folders eca--session))))
+                 :success-callback (-lambda (res)
+                                     (setf (eca--session-status eca--session) 'started)
+                                     (eca-info "Started!")
+                                     (eca-chat-open)
+                                     (with-current-buffer (get-buffer "*eca-chat*")
+                                       (setq-local buffer-offer-save t)
+                                       (setq-local buffer-save-without-query t)
+                                       (setq-local kill-buffer-query-functions
+                                                  (cons (lambda () nil)
+                                                        kill-buffer-query-functions)))
+                                     (run-hooks 'eca-after-initialize-hook)))))
+    ('started (eca-chat-open))))
 
 ;;;###autoload
 (defun eca ()

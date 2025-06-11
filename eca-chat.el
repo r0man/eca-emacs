@@ -38,7 +38,23 @@
 
 (defface eca-chat-prompt-prefix-face
   '((t (:foreground "green" :weight bold)))
-  "Face for the `eca-chat-prompt-prefix`.")
+  "Face for the `eca-chat-prompt-prefix`."
+  :group 'eca)
+
+(defface eca-chat-user-messages-face
+  '((t :inherit font-lock-doc-face))
+  "Face for the user sent messages in chat."
+  :group 'eca)
+
+(defface eca-chat-system-messages-face
+  '((t :inherit font-lock-comment-face))
+  "Face for the system messages in chat."
+  :group 'eca)
+
+(defface eca-chat-welcome-face
+  '((t :inherit font-lock-builtin-face :weight bold))
+  "Face for the welcome message in chat."
+  :group 'eca)
 
 ;; Internal
 
@@ -46,7 +62,7 @@
 (defvar-local eca--chat-history-index 0)
 
 (defun eca-chat--prompt-prefix ()
-  "The full prompt prefix"
+  "The full chat prompt prefix."
   (concat eca-chat-prompt-prefix eca-chat-prompt-separator))
 
 (defvar eca-chat-mode-map
@@ -93,9 +109,12 @@ This is similar to `backward-delete-char' but protects the prompt line."
       (when (search-backward-regexp (concat "^" (regexp-quote (eca-chat--prompt-prefix))) nil t)
         (forward-char (length (eca-chat--prompt-prefix)))
         (delete-region (point) (point-max)))
-      ;; TODO
-      (eca-api-request-async :method "chat/prompt"
-                             :params (list :message prompt)))))
+      (eca-api-request-async
+       :method "chat/prompt"
+       :params (list :message prompt)
+       :success-callback (-lambda (res)
+                           ;; TODO
+                           )))))
 
 (define-derived-mode eca-chat-mode fundamental-mode "eca-chat"
   "Major mode for ECA chat sessions.
@@ -103,13 +122,17 @@ This is similar to `backward-delete-char' but protects the prompt line."
   :group 'eca
   (setq major-mode 'eca-chat-mode)
   (setq mode-name "eca-chat")
+  (setq-local mode-line-format '())
+  (visual-line-mode)
   (use-local-map eca-chat-mode-map)
   (save-excursion
     (goto-char (point-min))
     (unless (search-forward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
-      (insert "\n\n")
+      (insert "\n")
+      (insert (propertize "Welcome to ECA! What you have in mind?\n\n"
+                          'face 'eca-chat-welcome-face))
       (insert (propertize eca-chat-prompt-prefix 'face 'eca-chat-prompt-prefix-face))
-      (insert (propertize eca-chat-prompt-separator 'face nil))))
+      (insert (propertize eca-chat-prompt-separator 'face 'eca-chat-user-messages-face))))
   (goto-char (point-max))
   (run-hooks 'eca-chat-mode-hook))
 
@@ -119,17 +142,43 @@ This is similar to `backward-delete-char' but protects the prompt line."
 
 (defun eca--chat-select-window ()
   "Select the Window."
-  (select-window (get-buffer-window (buffer-name)))
-  (set-window-dedicated-p (selected-window) t))
+  (select-window (get-buffer-window (buffer-name))))
 
 (defun eca--chat-pop-window ()
   "Pop eca dedicated window if it exists."
-  (display-buffer (buffer-name) `(display-buffer-in-side-window (side . right) (window-width . ,eca-chat-window-width)))
-  (select-window (get-buffer-window (buffer-name)))
-  (set-window-buffer (get-buffer-window (buffer-name)) (buffer-name))
-  (set-window-dedicated-p (selected-window) t))
+  (let ((buffer (current-buffer)))
+    (display-buffer buffer
+                   '((display-buffer-in-side-window)
+                     (side . right)
+                     (window-width . ,eca-chat-window-width)))
+    (select-window (get-buffer-window buffer))
+    (set-window-buffer (get-buffer-window buffer) buffer)))
 
 ;; Public
+
+(defun eca-chat-content-received (params)
+  "..."
+  (let* ((role (plist-get params :role))
+         (is-complete? (plist-get params :isComplete))
+         (content (plist-get params :content))
+         (type (plist-get content :type))
+         (text (plist-get content :text)))
+    (when is-complete?
+      (setq-local mode-line-format '()))
+    (pcase type
+      ("text" (when text
+                (with-current-buffer (eca--chat-get-or-create-buffer)
+                  (save-excursion
+                    (goto-char (point-max))
+                    (goto-char (line-beginning-position))
+                    (goto-char (1- (point)))
+                    (pcase role
+                      ("user" (insert (propertize text
+                                                  'face 'eca-chat-user-messages-face
+                                                  'line-prefix (propertize (eca-chat--prompt-prefix) 'face 'eca-chat-user-messages-face)
+                                                  'line-spacing 10)))
+                      (default (insert text)))))))
+      ("temporary-text" (setq-local mode-line-format `(,(propertize text 'face 'eca-chat-system-messages-face)))))))
 
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
