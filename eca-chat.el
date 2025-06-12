@@ -36,6 +36,12 @@
   :type 'string
   :group 'eca)
 
+(defcustom eca-chat-model nil
+  "Which model to use during chat, nil means auto, let server decide.
+Must be a valid model supported by server."
+  :type 'string
+  :group 'eca)
+
 (defface eca-chat-prompt-prefix-face
   '((t (:foreground "green" :weight bold)))
   "Face for the `eca-chat-prompt-prefix`."
@@ -56,10 +62,21 @@
   "Face for the welcome message in chat."
   :group 'eca)
 
+(defface eca-chat-option-key-face
+  '((t :inherit font-lock-doc-face))
+  "Face for the option keys in header-line of the chat."
+  :group 'eca)
+
+(defface eca-chat-option-value-face
+  '((t :weight bold))
+  "Face for the option values in header-line of the chat."
+  :group 'eca)
+
 ;; Internal
 
 (defvar-local eca--chat-history '())
 (defvar-local eca--chat-history-index 0)
+(defvar-local eca--selected-model nil)
 
 (defun eca-chat--clear ()
   "Clear the chat."
@@ -121,11 +138,20 @@ This is similar to `backward-delete-char' but protects the prompt line."
         (delete-region (point) (point-max)))
       (eca-api-request-async
        :method "chat/prompt"
-       :params (list :message prompt)
+       :params (list :message prompt
+                     :model (when eca-chat-model eca-chat-model))
        :success-callback (-lambda (res)
-
                            ;; TODO
                            )))))
+
+(defun eca-chat--header-line--string ()
+  "Update chat header line."
+  (let ((model-str (or eca-chat-model "auto")))
+    (list (propertize "model:" 'face 'eca-chat-option-key-face)
+          (propertize model-str 'face 'eca-chat-option-value-face)
+          "  "
+          (propertize "context:" 'face 'eca-chat-option-key-face)
+          (propertize "none" 'face 'eca-chat-option-value-face))))
 
 (define-derived-mode eca-chat-mode fundamental-mode "eca-chat"
   "Major mode for ECA chat sessions.
@@ -138,6 +164,9 @@ This is similar to `backward-delete-char' but protects the prompt line."
   (use-local-map eca-chat-mode-map)
   (setq-local eca--chat-history '())
   (setq-local eca--chat-history-index 0)
+  (unless (listp header-line-format)
+    (setq-local header-line-format (list header-line-format)))
+  (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line--string))))
   (save-excursion
     (goto-char (point-min))
     (unless (search-forward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
