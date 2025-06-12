@@ -26,13 +26,8 @@
   :type 'integer
   :group 'eca)
 
-(defcustom eca-chat-prompt-prefix "​>"
+(defcustom eca-chat-prompt-prefix "> "
   "The prompt prefix string used in eca chat buffer."
-  :type 'string
-  :group 'eca)
-
-(defcustom eca-chat-prompt-separator " "
-  "The prompt sufix used in eca chat buffer."
   :type 'string
   :group 'eca)
 
@@ -76,20 +71,21 @@ Must be a valid model supported by server."
 
 (defvar-local eca--chat-history '())
 (defvar-local eca--chat-history-index 0)
-(defvar-local eca--selected-model nil)
+
+(defun eca-chat--insert-prompt-string ()
+  ""
+  ;; (let ((context-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position))  (current-buffer))))
+  ;;   (overlay-put context-ov 'eca-context t)
+  ;;   (overlay-put context-ov 'before-string (propertize "@" 'face 'eca-chat-prompt-prefix-face)))
+  (insert "\n")
+  (let ((prompt-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position))  (current-buffer))))
+    (overlay-put prompt-ov 'eca-prompt t)
+    (overlay-put prompt-ov 'before-string (propertize eca-chat-prompt-prefix 'face 'eca-chat-prompt-prefix-face))))
 
 (defun eca-chat--clear ()
   "Clear the chat."
   (with-current-buffer (eca--chat-get-or-create-buffer)
-    (let ((prompt (save-excursion
-                    (goto-char (point-max))
-                    (search-backward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
-                    (goto-char (1- (point))))))
-      (delete-region (point-min) prompt))))
-
-(defun eca-chat--prompt-prefix ()
-  "The full chat prompt prefix."
-  (concat eca-chat-prompt-prefix eca-chat-prompt-separator))
+    (delete-region (point-min) (point-max))))
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
@@ -106,36 +102,32 @@ Must be a valid model supported by server."
   (interactive)
   (insert "\n"))
 
+(defun eca-chat--prompt-start-point ()
+  ""
+  (overlay-start
+   (-first (-lambda (ov) (eq t (overlay-get ov 'eca-prompt)))
+           (overlays-in (point-min) (point-max)))))
+
 (defun eca-chat--backward-delete-char ()
   "Delete the character before point, unless at the prompt boundary.
 This is similar to `backward-delete-char' but protects the prompt line."
   (interactive)
-  (let ((prompt-start (save-excursion
-                        (goto-char (line-beginning-position))
-                        (when (looking-at (regexp-quote (eca-chat--prompt-prefix)))
-                          (point)))))
+  (let ((prompt-start (eca-chat--prompt-start-point)))
     (if (and prompt-start
-             (<= (point) (+ prompt-start (length (eca-chat--prompt-prefix)))))
+             (<= (point) prompt-start))
         (ding)
       (delete-char -1))))
 
 (defun eca-chat--send-return ()
   "Send the current prompt to eca process if in prompt."
   (interactive)
-  (let ((prompt (save-excursion
-                  (goto-char (point-max))
-                  (search-backward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
-                  (forward-char (length (eca-chat--prompt-prefix)))
-                  (string-trim (buffer-substring-no-properties (point) (point-max))))))
+  (let* ((prompt-start (eca-chat--prompt-start-point))
+         (prompt (save-excursion
+                   (goto-char prompt-start)
+                   (string-trim (buffer-substring-no-properties (point) (point-max))))))
     (unless (string-empty-p prompt)
-      (when (seq-empty-p eca--chat-history) (eca-chat--clear))
-      (add-to-list 'eca--chat-history prompt)
-      (setq eca--chat-history-index 0)
-
-      (goto-char (point-max)) ;; Go to end before searching back
-      (when (search-backward-regexp (concat "^" (regexp-quote (eca-chat--prompt-prefix))) nil t)
-        (forward-char (length (eca-chat--prompt-prefix)))
-        (delete-region (point) (point-max)))
+      (goto-char prompt-start)
+      (delete-region (point) (point-max))
       (eca-api-request-async
        :method "chat/prompt"
        :params (list :message prompt
@@ -167,15 +159,14 @@ This is similar to `backward-delete-char' but protects the prompt line."
   (unless (listp header-line-format)
     (setq-local header-line-format (list header-line-format)))
   (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line--string))))
-  (save-excursion
-    (goto-char (point-min))
-    (unless (search-forward-regexp (concat "^" (eca-chat--prompt-prefix)) nil t)
+  (unless (eq 0 (string-trim (buffer-string)))
+    (save-excursion
+      (goto-char (point-min))
       (insert "\n")
       (insert (propertize (eca--session-chat-welcome-message eca--session)
-                          'face 'eca-chat-welcome-face))
-      (insert (propertize eca-chat-prompt-prefix 'face 'eca-chat-prompt-prefix-face))
-      (insert (propertize eca-chat-prompt-separator 'face 'eca-chat-user-messages-face))))
+                          'face 'eca-chat-welcome-face))))
   (goto-char (point-max))
+  (eca-chat--insert-prompt-string)
   (run-hooks 'eca-chat-mode-hook))
 
 (defun eca--chat-get-or-create-buffer ()
@@ -224,7 +215,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
                    (pcase role
                      ("user" (propertize text
                                          'face 'eca-chat-user-messages-face
-                                         'line-prefix (propertize (eca-chat--prompt-prefix) 'face 'eca-chat-user-messages-face)
+                                         'line-prefix (propertize eca-chat-prompt-prefix 'face 'eca-chat-user-messages-face)
                                          'line-spacing 10))
                      (default (propertize text
                                           'line-height 20)))))))
