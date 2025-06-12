@@ -3,7 +3,7 @@
 ;; Author: Eric Dallo <ercdll1337@gmail.com>
 ;; Maintainer: Eric Dallo <ercdll1337@gmail.com>
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "28.1") (dash "2.18.0"))
+;; Package-Requires: ((emacs "28.1") (dash "2.18.0") (f "0.20.0"))
 ;; Keywords: ai emacs llm eca ai-pair-programming tools
 ;; Homepage: https://github.com/ericdallo/eca-emacs
 ;;
@@ -226,12 +226,6 @@ If not provided, download and start eca automatically."
                                      (setf (eca--session-models eca--session) (plist-get res :models))
                                      (eca-info "Started!")
                                      (eca-chat-open)
-                                     (with-current-buffer (get-buffer "*eca-chat*")
-                                       (setq-local buffer-offer-save t)
-                                       (setq-local buffer-save-without-query t)
-                                       (setq-local kill-buffer-query-functions
-                                                  (cons (lambda () nil)
-                                                        kill-buffer-query-functions)))
                                      (run-hooks 'eca-after-initialize-hook)))))
     ('started (eca-chat-open))))
 
