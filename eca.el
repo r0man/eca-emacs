@@ -3,7 +3,7 @@
 ;; Author: Eric Dallo <ercdll1337@gmail.com>
 ;; Maintainer: Eric Dallo <ercdll1337@gmail.com>
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "28.1") (dash "2.18.0") (f "0.20.0"))
+;; Package-Requires: ((emacs "28.1") (dash "2.18.0") (f "0.20.0") (markdown-mode "2.3")
 ;; Keywords: ai emacs llm eca ai-pair-programming tools
 ;; Homepage: https://github.com/ericdallo/eca-emacs
 ;;
@@ -216,14 +216,16 @@ If not provided, download and start eca automatically."
                                :clientInfo (list :name "emacs"
                                                  :version (emacs-version))
                                :capabilities (list :codeAssistant (list :chat t))
+                               :initializationOptions (list :chatBehavior eca-chat-custom-behavior)
                                :workspaceFolders (vconcat (-map (lambda (folder)
                                                                   (list :uri (eca--path-to-uri folder)
                                                                         :name (file-name-nondirectory (directory-file-name folder))))
                                                                 (eca--session-workspace-folders eca--session))))
-                 :success-callback (-lambda (res)
+                 :success-callback (-lambda ((&plist :chatWelcomeMessage msg :chatBehavior chat-behavior :models models))
                                      (setf (eca--session-status eca--session) 'started)
-                                     (setf (eca--session-chat-welcome-message eca--session) (plist-get res :chatWelcomeMessage))
-                                     (setf (eca--session-models eca--session) (plist-get res :models))
+                                     (setf (eca--session-chat-welcome-message eca--session) msg)
+                                     (setf (eca--session-models eca--session) models)
+                                     (setf (eca--session-chat-behavior eca--session) chat-behavior)
                                      (eca-info "Started!")
                                      (eca-chat-open)
                                      (run-hooks 'eca-after-initialize-hook)))))

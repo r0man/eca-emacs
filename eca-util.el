@@ -48,6 +48,9 @@
   ;; The suported models by the server.
   (models '())
 
+  ;; The chat behavior like agent, manual, ask.
+  (chat-behavior nil)
+
   ;; The welcome message for new chats.
   (chat-welcome-message ""))
 

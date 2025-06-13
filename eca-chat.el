@@ -12,6 +12,7 @@
 ;;; Code:
 
 (require 'f)
+(require 'markdown-mode)
 
 (require 'eca-util)
 (require 'eca-api)
@@ -42,6 +43,13 @@
   "Which model to use during chat, nil means auto, let server decide.
 Must be a valid model supported by server."
   :type 'string
+  :group 'eca)
+
+(defcustom eca-chat-custom-behavior nil
+  "Which chat behavior to use, if nil let server decide."
+  :type '(choice (const :tag "Agent, let server make changes as a co-pilot." agent)
+                 (const :tag "Ask, let server just answer questions." ask)
+                 (const :tag "Manual, let server suggest changes which require user approval." manual))
   :group 'eca)
 
 (defface eca-chat-prompt-prefix-face
@@ -84,7 +92,13 @@ Must be a valid model supported by server."
 (defvar-local eca-chat--history '())
 (defvar-local eca-chat--history-index 0)
 (defvar-local eca-chat--id nil)
+(defvar-local eca-chat--last-request-id 0)
 (defvar-local eca-chat--context '())
+
+(defun eca-chat--behavior ()
+  "The chat behavior considering what's in session and user option."
+  (or eca-chat-custom-behavior
+      (eca--session-chat-behavior eca--session)))
 
 (defun eca-chat--insert-prompt-string ()
   ""
@@ -92,11 +106,11 @@ Must be a valid model supported by server."
     (overlay-put prompt-area-ov 'eca-chat-prompt-area t))
   (let ((prompt-context-area-ov (make-overlay (line-beginning-position) (line-end-position) (current-buffer))))
     (overlay-put prompt-context-area-ov 'eca-chat-context-area t))
-  (insert (propertize eca-chat-context-prefix 'face 'eca-chat-context-face))
+  (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-face))
   (insert "\n")
   (let ((prompt-field-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)) (current-buffer))))
     (overlay-put prompt-field-ov 'eca-chat-prompt-field t)
-    (overlay-put prompt-field-ov 'before-string (propertize eca-chat-prompt-prefix 'face 'eca-chat-prompt-prefix-face))))
+    (overlay-put prompt-field-ov 'before-string (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-prompt-prefix-face))))
 
 (defun eca-chat--clear ()
   "Clear the chat."
@@ -104,7 +118,8 @@ Must be a valid model supported by server."
     (delete-region (point-min) (point-max))
     (remove-overlays (point-min) (point-max))
     (insert "\n")
-    (eca-chat--insert-prompt-string)))
+    (eca-chat--insert-prompt-string)
+    (eca-chat--refresh-context)))
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
@@ -160,19 +175,37 @@ This is similar to `backward-delete-char' but protects the prompt line."
       (eca-api-request-async
        :method "chat/prompt"
        :params (list :message prompt
+                     :request-id (cl-incf eca-chat--last-request-id)
                      :chatId eca-chat--id
-                     :model (when eca-chat-model eca-chat-model))
+                     :model (when eca-chat-model eca-chat-model)
+                     :behavior (eca-chat--behavior)
+                     :context (vconcat (-map (-lambda ((&plist :type type :value value))
+                                               (pcase type
+                                                 ('file (list :type "file" :path value))))
+                                             eca-chat--context)))
        :success-callback (-lambda (res)
                            (setq-local eca-chat--id (plist-get res :chatId)))))))
+
+(defun eca-chat--mark-last-message-sent (request-id)
+  ""
+  (with-current-buffer (eca--chat-get-or-create-buffer)
+    (let ((context-start (eca-chat--prompt-area-start-point)))
+      (save-excursion
+        (goto-char context-start)
+        (goto-char (1- (point)))
+        (overlay-put (make-overlay (point) (1+ (point)) (current-buffer))
+                     'eca-chat-request-id request-id)))))
 
 (defun eca-chat--header-line--string ()
   "Update chat header line."
   (let ((model-str (or eca-chat-model "auto")))
-    (list (propertize "model:" 'face 'eca-chat-option-key-face)
-          (propertize model-str 'face 'eca-chat-option-value-face)
-          "  ")))
+    (list (propertize "model:" 'font-lock-face 'eca-chat-option-key-face)
+          (propertize model-str 'font-lock-face 'eca-chat-option-value-face)
+          "  "
+          (propertize "behavior:" 'font-lock-face 'eca-chat-option-key-face)
+          (propertize (eca--session-chat-behavior eca--session) 'font-lock-face 'eca-chat-option-value-face))))
 
-(define-derived-mode eca-chat-mode fundamental-mode "eca-chat"
+(define-derived-mode eca-chat-mode markdown-mode "eca-chat"
   "Major mode for ECA chat sessions.
 \\{eca-chat-mode-map}"
   :group 'eca
@@ -180,6 +213,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
   (setq mode-name "eca-chat")
   (setq-local mode-line-format '())
   (visual-line-mode)
+  (hl-line-mode -1)
   (use-local-map eca-chat-mode-map)
   (setq-local eca-chat--history '())
   (setq-local eca-chat--history-index 0)
@@ -191,7 +225,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
       (goto-char (point-min))
       (insert "\n")
       (insert (propertize (eca--session-chat-welcome-message eca--session)
-                          'face 'eca-chat-welcome-face))
+                          'font-lock-face 'eca-chat-welcome-face))
       (eca-chat--insert-prompt-string)))
   (goto-char (point-max))
   (run-hooks 'eca-chat-mode-hook))
@@ -221,7 +255,8 @@ This is similar to `backward-delete-char' but protects the prompt line."
       (save-excursion
         (goto-char context-start)
         (goto-char (1- (point)))
-        (insert content)))))
+        (insert content)
+        (point)))))
 
 (defun eca-chat--refresh-context ()
   ""
@@ -233,9 +268,9 @@ This is similar to `backward-delete-char' but protects the prompt line."
     (delete-region (point) (line-end-position))
     (seq-doseq (context eca-chat--context)
       (pcase (plist-get context :type)
-        ('file (insert (propertize (concat "@" (f-filename (plist-get context :value))) 'face 'eca-chat-context-face)))))
+        ('file (insert (propertize (concat "@" (f-filename (plist-get context :value))) 'font-lock-face 'eca-chat-context-face)))))
     (insert " ")
-    (insert (propertize "@" 'face 'eca-chat-context-face))))
+    (insert (propertize "@" 'font-lock-face 'eca-chat-context-face))))
 
 (defun eca-chat--add-context (type value)
   "Add to chat context VALUE of TYPE."
@@ -259,15 +294,19 @@ This is similar to `backward-delete-char' but protects the prompt line."
                   (eca--chat-add-content (propertize "\n" 'line-spacing 10))
                   (setq-local mode-line-format '()))
                 (when text
-                  (eca--chat-add-content
-                   (pcase role
-                     ("user" (propertize text
-                                         'face 'eca-chat-user-messages-face
-                                         'line-prefix (propertize eca-chat-prompt-prefix 'face 'eca-chat-user-messages-face)
-                                         'line-spacing 10))
-                     (_ (propertize text
-                                    'line-height 20)))))))
-      ("temporary-text" (setq-local mode-line-format `(,(propertize text 'face 'eca-chat-system-messages-face)))))))
+                  (pcase role
+                    ("user" (progn
+                              (eca--chat-add-content
+                               (propertize text
+                                           'font-lock-face 'eca-chat-user-messages-face
+                                           'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-user-messages-face)
+                                           'line-spacing 10))
+                              (font-lock-ensure)))
+                    (_ (progn
+                         (eca--chat-add-content
+                          (propertize text
+                                      'line-height 20))))))))
+      ("temporary-text" (setq-local mode-line-format `(,(propertize text 'font-lock-face 'eca-chat-system-messages-face)))))))
 
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
@@ -278,6 +317,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
         (delete-region (point-min) (point-max))
         (setf (eca--session-chat eca--session) (current-buffer)))
       (eca-chat-mode)
+      (display-line-numbers-mode -1)
       (eca-chat--add-context 'file (buffer-file-name source-buffer))
       (if (window-live-p (get-buffer-window (buffer-name)))
           (eca--chat-select-window)
