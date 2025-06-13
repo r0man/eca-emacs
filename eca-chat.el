@@ -68,7 +68,7 @@ Must be a valid model supported by server."
   :group 'eca)
 
 (defface eca-chat-system-messages-face
-  '((t :inherit font-lock-comment-face))
+  '((t :inherit font-lock-builtin-face))
   "Face for the system messages in chat."
   :group 'eca)
 
