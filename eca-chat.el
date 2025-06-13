@@ -100,6 +100,8 @@ Must be a valid model supported by server."
 (defvar-local eca-chat--last-request-id 0)
 (defvar-local eca-chat--context '())
 
+(defvar eca-chat-buffer-name "*eca-chat*")
+
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<backspace>") #'eca-chat--backward-delete-char)
@@ -129,7 +131,7 @@ Must be a valid model supported by server."
 
 (defun eca-chat--clear ()
   "Clear the chat."
-  (with-current-buffer (eca--chat-get-or-create-buffer)
+  (with-current-buffer (eca-chat--get-or-create-buffer)
     (delete-region (point-min) (point-max))
     (remove-overlays (point-min) (point-max))
     (insert "\n")
@@ -156,14 +158,31 @@ Must be a valid model supported by server."
     (overlay-start)))
 
 (defun eca-chat--backward-delete-char ()
-  "Delete the character before point, unless at the prompt boundary.
-This is similar to `backward-delete-char' but protects the prompt line."
+  "Delete the character before point, unless at the prompt or context boundary.
+Checks if it's in a context, removing it if so.
+This is similar to `backward-delete-char' but protects the prompt/context line."
   (interactive)
-  (let ((cur-ov (car (overlays-in (line-beginning-position) (point)))))
-    (if (and cur-ov
-             (<= (point) (overlay-start cur-ov)))
-        (ding)
-      (delete-char -1))))
+  (let* ((cur-ov (car (overlays-in (line-beginning-position) (point))))
+         (text (thing-at-point 'symbol))
+         (context-item (-some->> text
+                                 (get-text-property 0 'eca-chat-context-item))))
+    (cond
+     ((and cur-ov
+           context-item)
+        (setq-local eca-chat--context (delete context-item eca-chat--context))
+        (eca-chat--refresh-context)
+        (goto-char (line-end-position)))
+
+     ((and cur-ov
+           (<= (point) (overlay-start cur-ov)))
+      (ding))
+
+     ((and cur-ov
+           (overlay-get cur-ov 'eca-chat-context-area))
+      ;; trying to remove a space
+      )
+
+     (t (delete-char -1)))))
 
 (defun eca-chat--send-return ()
   "Send the current prompt to eca process if in prompt."
@@ -185,10 +204,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
                      :chatId eca-chat--id
                      :model (when eca-chat-model eca-chat-model)
                      :behavior (eca-chat--behavior)
-                     :context (vconcat (-map (-lambda ((&plist :type type :value value))
-                                               (pcase type
-                                                 ('file (list :type "file" :path value))))
-                                             eca-chat--context)))
+                     :contexts (eca-chat--contexts->request))
        :success-callback (-lambda (res)
                            (setq-local eca-chat--id (plist-get res :chatId)))))))
 
@@ -207,6 +223,86 @@ This is similar to `backward-delete-char' but protects the prompt line."
           (propertize "behavior:" 'font-lock-face 'eca-chat-option-key-face)
           (propertize (eca--session-chat-behavior eca--session) 'font-lock-face 'eca-chat-option-value-face))))
 
+(defun eca-chat--get-or-create-buffer ()
+  "Get the eca chat buffer for current project."
+  (get-buffer-create eca-chat-buffer-name))
+
+(defun eca-chat--select-window ()
+  "Select the Window."
+  (select-window (get-buffer-window (buffer-name))))
+
+(defun eca-chat--pop-window ()
+  "Pop eca dedicated window if it exists."
+  (let ((buffer (current-buffer)))
+    (display-buffer buffer
+                   '((display-buffer-in-side-window)
+                     (side . right)
+                     (window-width . ,eca-chat-window-width)))
+    (select-window (get-buffer-window buffer))
+    (set-window-buffer (get-buffer-window buffer) buffer)))
+
+(defun eca-chat--add-content (content)
+  "Add CONTENT to the chat."
+  (with-current-buffer (eca-chat--get-or-create-buffer)
+    (let ((context-start (eca-chat--prompt-area-start-point)))
+      (save-excursion
+        (goto-char context-start)
+        (goto-char (1- (point)))
+        (insert content)
+        (point)))))
+
+(defun eca-chat--refresh-context ()
+  "Refresh chat context."
+  (save-excursion
+    (-some-> (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-context-area)))
+                     (overlays-in (point-min) (point-max)))
+      (overlay-start)
+      (goto-char))
+    (delete-region (point) (line-end-position))
+    (seq-doseq (context eca-chat--context)
+      (pcase (plist-get context :type)
+        ("file" (let ((text (concat eca-chat-context-prefix (f-filename (plist-get context :value)))))
+                  (insert (propertize text
+                                      'eca-chat-context-item context
+                                      'font-lock-face 'eca-chat-context-linked-face))
+                  (insert " ")))))
+    (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-unlinked-face))))
+
+(defun eca-chat--contexts->request ()
+  "Convert contexts to a requestable structure."
+  (vconcat (-map (-lambda ((&plist :type type :value value))
+                   (pcase type
+                     ("file" (list :type "file" :path value))))
+                 eca-chat--context)) )
+
+(defun eca-chat--add-context (type value)
+  "Add to chat context VALUE of TYPE."
+  (pcase type
+    ("file" (add-to-list 'eca-chat--context (list :type "file" :value value) t)))
+  (eca-chat--refresh-context))
+
+(defun eca-chat--completion-annotate (item-label)
+  "Annonate ITEM-LABEL detail."
+  (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
+    (pcase type
+      ("file" path))))
+
+(defun eca-chat--completion-exit-function (item _status)
+  "Add to context the selected ITEM."
+  (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item)))
+    (pcase type
+      ("file" (eca-chat--add-context type path))))
+  (goto-char (line-end-position)))
+
+(defun eca-chat--context-to-completion (context)
+  "Convert CONTEXT to a completion item."
+  (propertize
+   (pcase (plist-get context :type)
+     ("file" (f-filename (plist-get context :path))))
+   'eca-chat-completion-item context))
+
+;; Public
+
 (define-derived-mode eca-chat-mode markdown-mode "eca-chat"
   "Major mode for ECA chat sessions.
 \\{eca-chat-mode-map}"
@@ -216,7 +312,7 @@ This is similar to `backward-delete-char' but protects the prompt line."
   (setq-local mode-line-format '())
   (visual-line-mode)
   (hl-line-mode -1)
-  (buffer-disable-undo)
+  ;; (buffer-disable-undo)
   (use-local-map eca-chat-mode-map)
   (setq-local eca-chat--history '())
   (setq-local eca-chat--history-index 0)
@@ -241,69 +337,6 @@ This is similar to `backward-delete-char' but protects the prompt line."
   (goto-char (point-max))
   (run-hooks 'eca-chat-mode-hook))
 
-(defun eca--chat-get-or-create-buffer ()
-  "Get the eca chat buffer for current project."
-  (get-buffer-create "*eca-chat*"))
-
-(defun eca--chat-select-window ()
-  "Select the Window."
-  (select-window (get-buffer-window (buffer-name))))
-
-(defun eca--chat-pop-window ()
-  "Pop eca dedicated window if it exists."
-  (let ((buffer (current-buffer)))
-    (display-buffer buffer
-                   '((display-buffer-in-side-window)
-                     (side . right)
-                     (window-width . ,eca-chat-window-width)))
-    (select-window (get-buffer-window buffer))
-    (set-window-buffer (get-buffer-window buffer) buffer)))
-
-(defun eca--chat-add-content (content)
-  "Add CONTENT to the chat."
-  (with-current-buffer (eca--chat-get-or-create-buffer)
-    (let ((context-start (eca-chat--prompt-area-start-point)))
-      (save-excursion
-        (goto-char context-start)
-        (goto-char (1- (point)))
-        (insert content)
-        (point)))))
-
-(defun eca-chat--refresh-context ()
-  "Refresh chat context."
-  (save-excursion
-    (-some-> (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-context-area)))
-                     (overlays-in (point-min) (point-max)))
-      (overlay-start)
-      (goto-char))
-    (delete-region (point) (line-end-position))
-    (seq-doseq (context eca-chat--context)
-      (pcase (plist-get context :type)
-        ('file (progn (insert (propertize (concat eca-chat-context-prefix (f-filename (plist-get context :value))) 'font-lock-face 'eca-chat-context-linked-face))
-                      (insert " ")))))
-    (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-unlinked-face))))
-
-(defun eca-chat--add-context (type value)
-  "Add to chat context VALUE of TYPE."
-  (pcase type
-    ("file" (add-to-list 'eca-chat--context (list :type 'file :value value) t)))
-  (eca-chat--refresh-context))
-
-(defun eca-chat--completion-annotate (item-label)
-  "Annonate ITEM-LABEL detail."
-  (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
-    (pcase type
-      ("file" path))))
-
-(defun eca-chat--completion-exit-function (item _status)
-  "Add to context the selected ITEM."
-  (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item)))
-    (pcase type
-      ("file" (eca-chat--add-context type path))))
-  (goto-char (line-end-position)))
-
-;; Public
-
 (defun eca-chat-content-received (params)
   "..."
   (let* ((role (plist-get params :role))
@@ -314,19 +347,19 @@ This is similar to `backward-delete-char' but protects the prompt line."
     (pcase type
       ("text" (progn
                 (when is-complete?
-                  (eca--chat-add-content (propertize "\n" 'line-spacing 10))
+                  (eca-chat--add-content (propertize "\n" 'line-spacing 10))
                   (setq-local mode-line-format '()))
                 (when text
                   (pcase role
                     ("user" (progn
-                              (eca--chat-add-content
+                              (eca-chat--add-content
                                (propertize text
                                            'font-lock-face 'eca-chat-user-messages-face
                                            'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-user-messages-face)
                                            'line-spacing 10))
                               (font-lock-ensure)))
                     (_ (progn
-                         (eca--chat-add-content
+                         (eca-chat--add-content
                           (propertize text
                                       'line-height 20))))))))
       ("temporary-text" (setq-local mode-line-format `(,(propertize text 'font-lock-face 'eca-chat-system-messages-face)))))))
@@ -334,41 +367,41 @@ This is similar to `backward-delete-char' but protects the prompt line."
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
   (let ((source-buffer (current-buffer)))
-    (with-current-buffer (eca--chat-get-or-create-buffer)
+    (unless (buffer-live-p (get-buffer eca-chat-buffer-name))
+      (with-current-buffer (eca-chat--get-or-create-buffer)
+        (eca-chat-mode)
+        (display-line-numbers-mode -1)
+        (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))))
+    (with-current-buffer (eca-chat--get-or-create-buffer)
       (unless (eca--session-chat eca--session)
         (read-only-mode -1)
         (delete-region (point-min) (point-max))
-        (setf (eca--session-chat eca--session) (current-buffer))
-        (eca-chat-mode)
-        (display-line-numbers-mode -1)
-        (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1)))
+        (setf (eca--session-chat eca--session) (current-buffer)))
       (eca-chat--add-context "file" (buffer-file-name source-buffer))
       (if (window-live-p (get-buffer-window (buffer-name)))
-          (eca--chat-select-window)
-        (eca--chat-pop-window)))))
+          (eca-chat--select-window)
+        (eca-chat--pop-window)))))
 
 (defun eca-chat-exit ()
   "Exit the ECA chat."
-  (with-current-buffer (eca--chat-get-or-create-buffer)
+  (with-current-buffer (eca-chat--get-or-create-buffer)
     (goto-char (point-max))
     (insert "*Closed session*")
     (read-only-mode)
     (setq-local eca-chat--id nil)
     (rename-buffer (concat (buffer-name) ":closed"))))
 
-;;;###autoload
-(defun eca-chat-clear ()
-  "Clear the eca chat."
-  (interactive)
-  (eca-chat--clear))
-
 (defun eca-chat-completion-at-point ()
   "Complete at point in the chat."
   (let ((candidates (lambda ()
                       (cond
                        ((eca-chat--point-at-new-context-p)
-                        (list (propertize "eca-chat.el" 'eca-chat-completion-item (list :type "file" :path "/home/greg/dev/eca-emacs/eca-chat.el"))
-                              (propertize "eca-util.el" 'eca-chat-completion-item (list :type "file" :path "/home/greg/dev/eca-emacs/eca-util.el"))))
+                        (-let (((&plist :contexts contexts) (eca-api-request-sync
+                                                             :method "chat/queryContext"
+                                                             :params (list :chatId eca-chat--id
+                                                                           :query (thing-at-point 'symbol t)
+                                                                           :contexts (eca-chat--contexts->request)))))
+                          (-map #'eca-chat--context-to-completion contexts)))
                        (t nil)))))
     (list
      (or (cl-first (bounds-of-thing-at-point 'symbol))
@@ -385,6 +418,12 @@ This is similar to `backward-delete-char' but protects the prompt line."
            (complete-with-action action (funcall candidates) probe pred))))
      :annotation-function #'eca-chat--completion-annotate
      :exit-function #'eca-chat--completion-exit-function)))
+
+;;;###autoload
+(defun eca-chat-clear ()
+  "Clear the eca chat."
+  (interactive)
+  (eca-chat--clear))
 
 (provide 'eca-chat)
 ;;; eca-chat.el ends here
