@@ -3,6 +3,8 @@
 [![MELPA](https://melpa.org/packages/eca-emacs-badge.svg)](https://melpa.org/#/eca-emacs)
 [![License: GPL-3.0+](https://img.shields.io/badge/License-GPLv3+-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
+![demo](./demo.png)
+
 ECA (Editor Code Assistant) is an AI-powered pair-programming client for Emacs.
 Inspired by lsp-mode’s JSONRPC handling, it connects to an external `eca` server process to provide interactive chat, code suggestions, context management and more.
 
@@ -43,6 +45,7 @@ Above are the most relevant configs one may want change:
 ## Roadmap
 
 - Auto download native binary.
+- Improve docs.
 - Multi session/projects support.
 - transient support.
 - Auto edit files support (agent). (depends on server)
