@@ -249,9 +249,9 @@ If not provided, download and start eca automatically."
     (eca-info "Shutting down...")
     (eca-api-request-sync :method "shutdown")
     (eca-api-notify :method "exit")
-    (kill-process (eca--session-process eca--session))
-    (eca-chat-exit)
-    (setq eca--session nil)))
+    (kill-process (eca--session-process eca--session)))
+  (eca-chat-exit)
+  (setq eca--session nil))
 
 (provide 'eca)
 ;;; eca.el ends here

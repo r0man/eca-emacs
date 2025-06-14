@@ -34,7 +34,7 @@
   :type 'string
   :group 'eca)
 
-(defcustom eca-chat-context-prefix eca-chat-context-prefix
+(defcustom eca-chat-context-prefix "@"
   "The context prefix string used in eca chat buffer."
   :type 'string
   :group 'eca)
@@ -178,8 +178,10 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (ding))
 
      ((and cur-ov
-           (overlay-get cur-ov 'eca-chat-context-area))
-      ;; trying to remove a space
+           (overlay-get cur-ov 'eca-chat-context-area)
+           (or (string= " " (string (char-before (point))))
+               (string= eca-chat-context-prefix (string (char-before (point))))))
+      ;; trying to remove a space or context-prefix
       )
 
      (t (delete-char -1)))))
@@ -260,45 +262,69 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (goto-char))
     (delete-region (point) (line-end-position))
     (seq-doseq (context eca-chat--context)
-      (pcase (plist-get context :type)
-        ("file" (let ((text (concat eca-chat-context-prefix (f-filename (plist-get context :value)))))
-                  (insert (propertize text
-                                      'eca-chat-context-item context
-                                      'font-lock-face 'eca-chat-context-linked-face))
-                  (insert " ")))))
+      (-let (((&plist :value value :type type) context))
+        (pcase type
+          ("file" (let ((text (concat eca-chat-context-prefix (f-filename value))))
+                    (insert (propertize text
+                                        'eca-chat-context-item context
+                                        'font-lock-face 'eca-chat-context-linked-face))
+                    (insert " ")))
+          ("directory" (let ((text (concat eca-chat-context-prefix (f-filename value))))
+                         (insert (propertize text
+                                             'eca-chat-context-item context
+                                             'font-lock-face 'eca-chat-context-linked-face))
+                         (insert " "))))))
     (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-unlinked-face))))
 
 (defun eca-chat--contexts->request ()
   "Convert contexts to a requestable structure."
   (vconcat (-map (-lambda ((&plist :type type :value value))
                    (pcase type
-                     ("file" (list :type "file" :path value))))
+                     ("file" (list :type "file" :path value))
+                     ("directory" (list :type "directory" :path value))))
                  eca-chat--context)) )
+
+(defconst eca-chat--kind->symbol
+  '(("file" . file)
+    ("directory" . folder)))
+
+(defun eca-chat--completion-candidate-kind (item)
+  "Return the kind for ITEM."
+  (message "--> %s" item)
+  (alist-get (plist-get (get-text-property 0 'eca-chat-completion-item item) :type)
+             eca-chat--kind->symbol
+             nil
+             nil
+             #'string=))
 
 (defun eca-chat--add-context (type value)
   "Add to chat context VALUE of TYPE."
   (pcase type
-    ("file" (add-to-list 'eca-chat--context (list :type "file" :value value) t)))
+    ("file" (add-to-list 'eca-chat--context (list :type "file" :value value) t))
+    ("directory" (add-to-list 'eca-chat--context (list :type "directory" :value value) t)))
   (eca-chat--refresh-context))
 
 (defun eca-chat--completion-annotate (item-label)
   "Annonate ITEM-LABEL detail."
   (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
     (pcase type
-      ("file" path))))
+      ("file" path)
+      ("directory" path))))
 
 (defun eca-chat--completion-exit-function (item _status)
   "Add to context the selected ITEM."
   (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item)))
     (pcase type
-      ("file" (eca-chat--add-context type path))))
+      ("file" (eca-chat--add-context type path))
+      ("directory" (eca-chat--add-context type path))))
   (goto-char (line-end-position)))
 
 (defun eca-chat--context-to-completion (context)
   "Convert CONTEXT to a completion item."
   (propertize
    (pcase (plist-get context :type)
-     ("file" (f-filename (plist-get context :path))))
+     ("file" (f-filename (plist-get context :path)))
+     ("directory" (f-filename (plist-get context :path))))
    'eca-chat-completion-item context))
 
 ;; Public
@@ -323,6 +349,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (company-mode 1)
     (setq-local company-backends '(company-capf)))
 
+  (setq-local mode-line-format '())
   (unless (listp header-line-format)
     (setq-local header-line-format (list header-line-format)))
   (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line--string))))
@@ -336,6 +363,35 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (eca-chat--insert-prompt-string)))
   (goto-char (point-max))
   (run-hooks 'eca-chat-mode-hook))
+
+(defun eca-chat-completion-at-point ()
+  "Complete at point in the chat."
+  (let ((candidates (lambda ()
+                      (cond
+                       ((eca-chat--point-at-new-context-p)
+                        (-let (((&plist :contexts contexts) (eca-api-request-sync
+                                                             :method "chat/queryContext"
+                                                             :params (list :chatId eca-chat--id
+                                                                           :query (thing-at-point 'symbol t)
+                                                                           :contexts (eca-chat--contexts->request)))))
+                          (-map #'eca-chat--context-to-completion contexts)))
+                       (t nil)))))
+    (list
+     (or (cl-first (bounds-of-thing-at-point 'symbol))
+         (point))
+     (point)
+     (lambda (probe pred action)
+       (cond
+          ((eq action 'metadata)
+           '(metadata (category . eca-capf)
+                      (display-sort-function . identity)
+                      (cycle-sort-function . identity)))
+          ((eq (car-safe action) 'boundaries) nil)
+          (t
+           (complete-with-action action (funcall candidates) probe pred))))
+     :company-kind #'eca-chat--completion-candidate-kind
+     :annotation-function #'eca-chat--completion-annotate
+     :exit-function #'eca-chat--completion-exit-function)))
 
 (defun eca-chat-content-received (params)
   "..."
@@ -374,8 +430,6 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
         (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))))
     (with-current-buffer (eca-chat--get-or-create-buffer)
       (unless (eca--session-chat eca--session)
-        (read-only-mode -1)
-        (delete-region (point-min) (point-max))
         (setf (eca--session-chat eca--session) (current-buffer)))
       (eca-chat--add-context "file" (buffer-file-name source-buffer))
       (if (window-live-p (get-buffer-window (buffer-name)))
@@ -384,40 +438,11 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
 (defun eca-chat-exit ()
   "Exit the ECA chat."
-  (with-current-buffer (eca-chat--get-or-create-buffer)
-    (goto-char (point-max))
-    (insert "*Closed session*")
-    (read-only-mode)
-    (setq-local eca-chat--id nil)
-    (rename-buffer (concat (buffer-name) ":closed"))))
-
-(defun eca-chat-completion-at-point ()
-  "Complete at point in the chat."
-  (let ((candidates (lambda ()
-                      (cond
-                       ((eca-chat--point-at-new-context-p)
-                        (-let (((&plist :contexts contexts) (eca-api-request-sync
-                                                             :method "chat/queryContext"
-                                                             :params (list :chatId eca-chat--id
-                                                                           :query (thing-at-point 'symbol t)
-                                                                           :contexts (eca-chat--contexts->request)))))
-                          (-map #'eca-chat--context-to-completion contexts)))
-                       (t nil)))))
-    (list
-     (or (cl-first (bounds-of-thing-at-point 'symbol))
-         (point))
-     (point)
-     (lambda (probe pred action)
-       (cond
-          ((eq action 'metadata)
-           '(metadata (category . eca-capf)
-                      (display-sort-function . identity)
-                      (cycle-sort-function . identity)))
-          ((eq (car-safe action) 'boundaries) nil)
-          (t
-           (complete-with-action action (funcall candidates) probe pred))))
-     :annotation-function #'eca-chat--completion-annotate
-     :exit-function #'eca-chat--completion-exit-function)))
+  (when (buffer-live-p (get-buffer eca-chat-buffer-name))
+    (with-current-buffer (eca-chat--get-or-create-buffer)
+      (goto-char (point-max))
+      (setq-local mode-line-format `(,(propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face)))
+      (rename-buffer (concat (buffer-name) ":closed" t)))))
 
 ;;;###autoload
 (defun eca-chat-clear ()
