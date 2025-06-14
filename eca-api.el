@@ -19,7 +19,7 @@
 ;; Variables
 
 (defcustom eca-api-response-timeout 10
-  "The max time to wait for eca responses"
+  "The max time to wait for eca responses."
   :group 'eca
   :type 'number)
 
@@ -40,6 +40,7 @@
        (json-read))))
 
 (defmacro eca-api--json-serialize (params)
+  "Deserialize PARAMS as json."
   (if (fboundp 'json-serialize)
       `(json-serialize ,params
         :null-object nil
@@ -66,7 +67,8 @@
 ;; Public
 
 (cl-defun eca-api-request-async (&key method params success-callback error-callback)
-  "TODO"
+  "Request async the ECA server passing METHOD and PARAMS.
+Call SUCCESS-CALLBACK when success or ERROR-CALLBACK when error."
   (let* ((id (cl-incf eca--last-id))
          (body `(:jsonrpc "2.0" :method ,method :params ,params :id ,id)))
     (setf (eca--session-response-handlers eca--session)
@@ -74,7 +76,7 @@
     (eca-api--send! body)))
 
 (cl-defun eca-api-request-sync (&key method params)
-  "TODO"
+  "Request sync the ECA server passing METHOD and PARAMS."
   (let* ((send-time (float-time))
          (expected-time (and eca-api-response-timeout
                              (+ send-time eca-api-response-timeout)))
@@ -100,6 +102,7 @@
      (resp-error (error resp-error)))))
 
 (cl-defun eca-api-notify (&key method params)
+  "Notify sync the ECA server passing METHOD and PARAMS."
   (let* ((body `(:jsonrpc "2.0" :method ,method :params ,params)))
     (eca-api--send! body)))
 

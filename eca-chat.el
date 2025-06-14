@@ -53,12 +53,12 @@ Must be a valid model supported by server."
   :group 'eca)
 
 (defface eca-chat-prompt-prefix-face
-  '((t (:foreground "green" :weight bold)))
+  '((t (:foreground "blue violet" :weight bold)))
   "Face for the `eca-chat-prompt-prefix`."
   :group 'eca)
 
 (defface eca-chat-context-unlinked-face
-  '((t (:foreground "cyan")))
+  '((t (:foreground "dodger blue")))
   "Face for the `eca-chat-context-prefix`."
   :group 'eca)
 
@@ -118,7 +118,7 @@ Must be a valid model supported by server."
       (eca--session-chat-behavior eca--session)))
 
 (defun eca-chat--insert-prompt-string ()
-  ""
+  "Insert the prompt and context string adding overlay metadatas."
   (let ((prompt-area-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)) (current-buffer))))
     (overlay-put prompt-area-ov 'eca-chat-prompt-area t))
   (let ((prompt-context-area-ov (make-overlay (line-beginning-position) (line-end-position) (current-buffer))))
@@ -145,13 +145,13 @@ Must be a valid model supported by server."
     (insert "\n")))
 
 (defun eca-chat--prompt-field-start-point ()
-  ""
+  "Return the metadata overlay for the prompt field start point."
   (overlay-start
    (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-prompt-field)))
            (overlays-in (point-min) (point-max)))))
 
 (defun eca-chat--prompt-area-start-point ()
-  ""
+  "Return the metadata overlay for the prompt area start point."
   (-some->
       (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-prompt-area)))
               (overlays-in (point-min) (point-max)))
@@ -211,7 +211,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                            (setq-local eca-chat--id (plist-get res :chatId)))))))
 
 (defun eca-chat--point-at-new-context-p ()
-  ""
+  "Return non-nil if point is at the context area."
   (and (eq (line-number-at-pos (point))
            (line-number-at-pos (eca-chat--prompt-area-start-point)))
        (eq (point) (line-end-position))))
@@ -394,7 +394,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
      :exit-function #'eca-chat--completion-exit-function)))
 
 (defun eca-chat-content-received (params)
-  "..."
+  "Handle the content received notification with PARAMS."
   (let* ((role (plist-get params :role))
          (is-complete? (plist-get params :isComplete))
          (content (plist-get params :content))

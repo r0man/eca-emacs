@@ -3,7 +3,7 @@
 ;; Author: Eric Dallo <ercdll1337@gmail.com>
 ;; Maintainer: Eric Dallo <ercdll1337@gmail.com>
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "28.1") (dash "2.18.0") (f "0.20.0") (markdown-mode "2.3")
+;; Package-Requires: ((emacs "28.1") (dash "2.18.0") (f "0.20.0") (markdown-mode "2.3"))
 ;; Keywords: ai emacs llm eca ai-pair-programming tools
 ;; Homepage: https://github.com/ericdallo/eca-emacs
 ;;
@@ -56,8 +56,7 @@ If not provided, download and start eca automatically."
   (concat "file://"
           (--> path
                (expand-file-name it)
-               (or (file-remote-p it 'localname t) it)
-               (url-hexify-string it lsp--url-path-allowed-chars))))
+               (or (file-remote-p it 'localname t) it))))
 
 (defun eca--get-message-type (json-data)
   "Get the message type from JSON-DATA."
@@ -90,9 +89,9 @@ If not provided, download and start eca automatically."
         (params (plist-get notification :params)))
     (pcase method
       ("chat/contentReceived" (eca-chat-content-received params))
-      (unknown (eca-warn "Unknown notification %s" method)))))
+      (_ (eca-warn "Unknown notification %s" method)))))
 
-(defun eca--handle-server-request (request)
+(defun eca--handle-server-request (_request)
   "Handle REQUEST sent by server."
   ;; TODO
   )
