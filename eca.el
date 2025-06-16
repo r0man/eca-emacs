@@ -32,7 +32,7 @@
 
 ;; Variables
 
-(defcustom eca-custom-command '("~/dev/eca/eca" "server")
+(defcustom eca-custom-command nil
   "The eca server command.
 If not provided, download and start eca automatically."
   :group 'eca
