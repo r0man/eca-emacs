@@ -290,7 +290,6 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
 (defun eca-chat--completion-candidate-kind (item)
   "Return the kind for ITEM."
-  (message "--> %s" item)
   (alist-get (plist-get (get-text-property 0 'eca-chat-completion-item item) :type)
              eca-chat--kind->symbol
              nil
@@ -414,11 +413,13 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                                            'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-user-messages-face)
                                            'line-spacing 10))
                               (font-lock-ensure)))
+                    ("system" (progn
+                                (eca-chat--add-content
+                                 (propertize text
+                                             'line-height 20
+                                             'font-lock-face 'eca-chat-system-messages-face))))
                     (_ (progn
-                         (eca-chat--add-content
-                          (propertize text
-                                      'line-height 20
-                                      'font-lock-face 'eca-chat-system-messages-face))))))))
+                         (eca-chat--add-content text)))))))
       ("temporary-text" (setq-local mode-line-format `(,(propertize text 'font-lock-face 'eca-chat-system-messages-face)))))))
 
 (defun eca-chat-open ()
