@@ -41,7 +41,7 @@
 
 (defcustom eca-chat-model nil
   "Which model to use during chat, nil means auto, let server decide.
-Must be a valid model supported by server."
+Must be a valid model supported by server, check `eca-chat-select-model`."
   :type 'string
   :group 'eca)
 
@@ -417,7 +417,8 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                     (_ (progn
                          (eca-chat--add-content
                           (propertize text
-                                      'line-height 20))))))))
+                                      'line-height 20
+                                      'font-lock-face 'eca-chat-system-messages-face))))))))
       ("temporary-text" (setq-local mode-line-format `(,(propertize text 'font-lock-face 'eca-chat-system-messages-face)))))))
 
 (defun eca-chat-open ()
@@ -449,6 +450,15 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   "Clear the eca chat."
   (interactive)
   (eca-chat--clear))
+
+;;;###autoload
+(defun eca-chat-select-model ()
+  "Select which model to use in the chat from what server supports."
+  (interactive)
+  (when-let ((model (completing-read "Select a model:" (append '(auto) (append (eca--session-models eca--session) nil)) nil t)))
+    (if (string= "auto" model)
+        (setq eca-chat-model nil)
+      (setq eca-chat-model model))))
 
 (provide 'eca-chat)
 ;;; eca-chat.el ends here

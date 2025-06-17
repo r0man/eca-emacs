@@ -46,9 +46,9 @@ Above are the most relevant configs one may want change:
 
 ## Roadmap
 
-- Auto download native binary.
 - Improve docs.
 - Error handling
+- Improve add context 
 - Multi session/projects support.
 - transient support.
 - Auto edit files support (agent). (depends on server)
