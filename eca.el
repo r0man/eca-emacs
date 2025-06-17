@@ -39,6 +39,59 @@ If not provided, download and start eca automatically."
   :risky t
   :type '(repeat string))
 
+(defcustom eca-server-download-url
+  (format "https://github.com/editor-code-assistant/eca/releases/latest/download/eca-native-static-%s.zip"
+          (let ((arch (car (split-string system-configuration "-"))))
+            (pcase system-type
+              ('gnu/linux (concat "linux-"
+                                  (cond
+                                   ((string= "x86_64" arch) "amd64")
+                                   (t arch))))
+              ('darwin (concat "macos-"
+                               (cond
+                                ((string= "x86_64" arch) "amd64")
+                                (t arch))))
+              ('windows-nt "windows-amd64"))))
+  "The URL to download eca server."
+  :group 'eca
+  :type 'string)
+
+(defcustom eca-server-install-path
+  (f-join (expand-file-name
+           (locate-user-emacs-file "eca"))
+          (if (eq system-type 'windows-nt)
+              "eca.exe"
+            "eca"))
+  "Directory in which eca will be downloaded."
+  :risky t
+  :type 'directory
+  :group 'eca)
+
+(defconst eca-ext-pwsh-script "pwsh -noprofile -noninteractive \
+-nologo -ex bypass -c Expand-Archive -Path '%s' -DestinationPath '%s'"
+  "Pwsh script to unzip file.")
+
+(defconst eca-ext-powershell-script "powershell -noprofile -noninteractive \
+-nologo -ex bypass -command Expand-Archive -path '%s' -dest '%s'"
+  "Powershell script to unzip file.")
+
+(defconst eca-ext-unzip-script "bash -c 'mkdir -p %2$s && unzip -qq -o %1$s -d %2$s'"
+  "Unzip script to unzip file.")
+
+(defcustom eca-unzip-script (lambda ()
+                              (cond ((and (eq system-type 'windows-nt)
+                                          (executable-find "pwsh"))
+                                     eca-ext-pwsh-script)
+                                    ((and (eq system-type 'windows-nt)
+                                          (executable-find "powershell"))
+                                     eca-ext-powershell-script)
+                                    ((executable-find "unzip") eca-ext-unzip-script)
+                                    ((executable-find "pwsh") eca-ext-pwsh-script)
+                                    (t nil)))
+  "The script to unzip downloaded eca server."
+  :group 'eca
+  :type 'string)
+
 (defcustom eca-before-initialize-hook nil
   "List of functions to be called before ECA has been initialized."
   :type 'hook
@@ -67,6 +120,34 @@ If not provided, download and start eca automatically."
             'request
           'response))
     'notification))
+
+(defun eca--download-server ()
+  "Download eca server."
+  (let* ((url eca-server-download-url)
+         (store-path eca-server-install-path)
+         (download-path (concat store-path ".zip")))
+    (make-thread
+     (lambda ()
+       (condition-case err
+           (progn
+             (when (f-exists? download-path) (f-delete download-path))
+             (when (f-exists? store-path) (f-delete store-path))
+             (eca-info "Starting to download eca to %s..." download-path)
+             (mkdir (f-parent download-path) t)
+             (url-copy-file url download-path)
+             (unless eca-unzip-script
+               (error "Unable to find `unzip' or `powershell' on the path, please customize `eca-unzip-script'"))
+             (shell-command (format (funcall eca-unzip-script) download-path (f-parent store-path)))
+             (eca-info "Downloaded eca successfully"))
+         (error "Could not download eca server" err))))))
+
+(defun eca--server-command ()
+  "Build the eca server command downloading server if not provided."
+  (or eca-custom-command
+      (unless (f-exists? eca-server-install-path)
+        (eca--download-server)
+        nil)
+      (list eca-server-install-path "server")))
 
 (defun eca--parse-header (s)
   "Parse string S as a ECA (KEY . VAL) header."
@@ -192,7 +273,7 @@ If not provided, download and start eca automatically."
              :coding 'no-conversion
              :connection-type 'pipe
              :name "eca"
-             :command eca-custom-command
+             :command (eca--server-command)
              :buffer "*eca*"
              :stderr stderr-buffer
              :filter #'eca--process-filter
