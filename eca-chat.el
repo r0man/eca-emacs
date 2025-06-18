@@ -386,6 +386,9 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                           'font-lock-face 'eca-chat-welcome-face))
       (eca-chat--insert-prompt-string)))
 
+  (face-remap-add-relative 'markdown-line-break-face
+                           '(:underline nil))
+
   (run-with-timer
    0.05
    nil
