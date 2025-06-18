@@ -279,6 +279,12 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (insert content)
       (point))))
 
+(defun eca-chat--relativize-filename-for-workspace-root (filename roots)
+  "Relativize the FILENAME if a workspace root is found for ROOTS."
+  (or (-some->> (-first (lambda (root) (f-ancestor-of? root filename)) roots)
+        (f-relative filename))
+      filename))
+
 (defun eca-chat--refresh-context ()
   "Refresh chat context."
   (save-excursion
@@ -329,12 +335,12 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     ("directory" (add-to-list 'eca-chat--context (list :type "directory" :value value) t)))
   (eca-chat--refresh-context))
 
-(defun eca-chat--completion-annotate (item-label)
-  "Annonate ITEM-LABEL detail."
+(defun eca-chat--completion-annotate (roots item-label)
+  "Annonate ITEM-LABEL detail for ROOTS."
   (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
     (pcase type
-      ("file" path)
-      ("directory" path))))
+      ("file" (eca-chat--relativize-filename-for-workspace-root path roots))
+      ("directory" (eca-chat--relativize-filename-for-workspace-root path roots)))))
 
 (defun eca-chat--completion-exit-function (item _status)
   "Add to context the selected ITEM."
@@ -428,7 +434,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
           (t
            (complete-with-action action (funcall candidates) probe pred))))
      :company-kind #'eca-chat--completion-candidate-kind
-     :annotation-function #'eca-chat--completion-annotate
+     :annotation-function (-partial #'eca-chat--completion-annotate (eca--session-workspace-folders eca--session))
      :exit-function #'eca-chat--completion-exit-function)))
 
 (defun eca-chat-content-received (params)
