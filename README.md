@@ -7,10 +7,10 @@
 
 ![demo](./demo.png)
 
-ECA (Editor Code Assistant) is an AI-powered pair-programming client for Emacs.
+ECA (Editor Code Assistant) Emacs is an AI-powered pair-programming client for Emacs.
 Inspired by lsp-mode’s JSONRPC handling, it connects to an external `eca` server process to provide interactive chat, code suggestions, context management and more.
 
-For more details about ECA, check [ECA server](https://github.com/eca/eca).
+For more details about ECA, check [ECA server](https://github.com/editor-code-assistant/eca).
 
 ## Requirements
 
