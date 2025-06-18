@@ -53,12 +53,12 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :group 'eca)
 
 (defface eca-chat-prompt-prefix-face
-  '((t (:foreground "blue violet" :weight bold)))
+  '((t (:foreground "lime green" :weight bold)))
   "Face for the `eca-chat-prompt-prefix`."
   :group 'eca)
 
 (defface eca-chat-context-unlinked-face
-  '((t (:foreground "dodger blue")))
+  '((t (:foreground "gold")))
   "Face for the `eca-chat-context-prefix`."
   :group 'eca)
 
@@ -99,6 +99,9 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--id nil)
 (defvar-local eca-chat--last-request-id 0)
 (defvar-local eca-chat--context '())
+(defvar-local eca-chat--spinner-string "")
+(defvar-local eca-chat--spinner-timer nil)
+(defvar-local eca-chat--progress-text "")
 
 (defvar eca-chat-buffer-name "*eca-chat*")
 
@@ -111,6 +114,26 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "<return>") #'eca-chat--send-return)
     map)
   "Keymap used by `eca-chat-mode'.")
+
+(defun eca-chat--spinner-start ()
+  "Start modeline spinner."
+  (setq eca-chat--spinner-timer
+        (run-with-timer
+         0
+         0.5
+         (lambda ()
+           (with-current-buffer (eca-chat--get-or-create-buffer)
+             (if (eq 3 (length eca-chat--spinner-string))
+                 (setq eca-chat--spinner-string ".")
+               (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
+             (force-mode-line-update))))))
+
+(defun eca-chat--spinner-stop ()
+  "Stop modeline spinner."
+  (when eca-chat--spinner-timer
+    (cancel-timer eca-chat--spinner-timer)
+    (setq eca-chat--spinner-timer nil))
+  (setq eca-chat--spinner-string ""))
 
 (defun eca-chat--behavior ()
   "The chat behavior considering what's in session and user option."
@@ -216,7 +239,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
            (line-number-at-pos (eca-chat--prompt-area-start-point)))
        (eq (point) (line-end-position))))
 
-(defun eca-chat--header-line--string ()
+(defun eca-chat--header-line-string ()
   "Update chat header line."
   (let ((model-str (or eca-chat-model "auto")))
     (list (propertize "model:" 'font-lock-face 'eca-chat-option-key-face)
@@ -224,6 +247,10 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
           "  "
           (propertize "behavior:" 'font-lock-face 'eca-chat-option-key-face)
           (propertize (eca--session-chat-behavior eca--session) 'font-lock-face 'eca-chat-option-value-face))))
+
+(defun eca-chat--mode-line-string ()
+  "Update chat mode line."
+  (concat eca-chat--progress-text eca-chat--spinner-string))
 
 (defun eca-chat--get-or-create-buffer ()
   "Get the eca chat buffer for current project."
@@ -245,13 +272,12 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
 (defun eca-chat--add-content (content)
   "Add CONTENT to the chat."
-  (with-current-buffer (eca-chat--get-or-create-buffer)
-    (let ((context-start (eca-chat--prompt-area-start-point)))
-      (save-excursion
-        (goto-char context-start)
-        (goto-char (1- (point)))
-        (insert content)
-        (point)))))
+  (let ((context-start (eca-chat--prompt-area-start-point)))
+    (save-excursion
+      (goto-char context-start)
+      (goto-char (1- (point)))
+      (insert content)
+      (point))))
 
 (defun eca-chat--refresh-context ()
   "Refresh chat context."
@@ -334,7 +360,6 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   :group 'eca
   (setq major-mode 'eca-chat-mode)
   (setq mode-name "eca-chat")
-  (setq-local mode-line-format '())
   (visual-line-mode)
   (hl-line-mode -1)
   ;; (buffer-disable-undo)
@@ -348,10 +373,10 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (company-mode 1)
     (setq-local company-backends '(company-capf)))
 
-  (setq-local mode-line-format '())
   (unless (listp header-line-format)
     (setq-local header-line-format (list header-line-format)))
-  (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line--string))))
+  (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line-string))))
+  (force-mode-line-update)
 
   (when (eq 0 (length (string-trim (buffer-string))))
     (save-excursion
@@ -360,6 +385,17 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (insert (propertize (eca--session-chat-welcome-message eca--session)
                           'font-lock-face 'eca-chat-welcome-face))
       (eca-chat--insert-prompt-string)))
+
+  (run-with-timer
+   0.05
+   nil
+   (lambda ()
+     (with-current-buffer (eca-chat--get-or-create-buffer)
+       (display-line-numbers-mode -1)
+       (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
+       (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
+       (force-mode-line-update))))
+
   (goto-char (point-max))
   (run-hooks 'eca-chat-mode-hook))
 
@@ -395,16 +431,13 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-content-received (params)
   "Handle the content received notification with PARAMS."
   (let* ((role (plist-get params :role))
-         (is-complete? (plist-get params :isComplete))
          (content (plist-get params :content))
+         (state (plist-get content :state))
          (type (plist-get content :type))
          (text (plist-get content :text)))
-    (pcase type
-      ("text" (progn
-                (when is-complete?
-                  (eca-chat--add-content (propertize "\n" 'line-spacing 10))
-                  (setq-local mode-line-format '()))
-                (when text
+    (with-current-buffer (eca-chat--get-or-create-buffer)
+      (pcase type
+        ("text" (when text
                   (pcase role
                     ("user" (progn
                               (eca-chat--add-content
@@ -419,17 +452,23 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                                              'line-height 20
                                              'font-lock-face 'eca-chat-system-messages-face))))
                     (_ (progn
-                         (eca-chat--add-content text)))))))
-      ("temporary-text" (setq-local mode-line-format `(,(propertize text 'font-lock-face 'eca-chat-system-messages-face)))))))
+                         (eca-chat--add-content text))))))
+        ("progress" (pcase state
+                      ("running" (progn
+                                   (unless eca-chat--spinner-timer
+                                     (eca-chat--spinner-start))
+                                   (setq-local eca-chat--progress-text (propertize text 'font-lock-face 'eca-chat-system-messages-face))))
+                      ("finished" (progn
+                                    (eca-chat--spinner-stop)
+                                    (eca-chat--add-content (propertize "\n" 'line-spacing 10))
+                                    (setq-local eca-chat--progress-text "")))))))))
 
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
   (let ((source-buffer (current-buffer)))
     (unless (buffer-live-p (get-buffer eca-chat-buffer-name))
       (with-current-buffer (eca-chat--get-or-create-buffer)
-        (eca-chat-mode)
-        (display-line-numbers-mode -1)
-        (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))))
+        (eca-chat-mode)))
     (with-current-buffer (eca-chat--get-or-create-buffer)
       (unless (eca--session-chat eca--session)
         (setf (eca--session-chat eca--session) (current-buffer)))
@@ -444,7 +483,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (with-current-buffer (eca-chat--get-or-create-buffer)
       (goto-char (point-max))
       (setq-local mode-line-format `(,(propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face)))
-      (rename-buffer (concat (buffer-name) ":closed" t)))))
+      (rename-buffer (concat (buffer-name) ":closed") t))))
 
 ;;;###autoload
 (defun eca-chat-clear ()
