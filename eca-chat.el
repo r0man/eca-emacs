@@ -1,7 +1,7 @@
 ;;; eca-chat.el --- ECA (Editor Code Assistant) chat -*- lexical-binding: t; -*-
 ;; Copyright (C) 2025 Eric Dallo
 ;;
-;; SPDX-License-Identifier: GPL-3.0-or-later
+;; SPDX-License-Identifier: Apache-2.0
 ;;
 ;; This file is not part of GNU Emacs.
 ;;

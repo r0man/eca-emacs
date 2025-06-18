@@ -7,7 +7,7 @@
 ;; Keywords: ai emacs llm eca ai-pair-programming tools
 ;; Homepage: https://github.com/ericdallo/eca-emacs
 ;;
-;; SPDX-License-Identifier: GPL-3.0-or-later
+;; SPDX-License-Identifier: Apache-2.0
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
