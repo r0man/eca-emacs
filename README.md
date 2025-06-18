@@ -21,10 +21,16 @@ For more details about ECA, check [ECA server](https://github.com/eca/eca).
 
 ## Installation
 
-You can install from MELPA with package.el:
+### Melpa (wip)
 
 ```
 M-x package-install eca
+```
+
+### Doom Emacs:
+
+```elisp
+(package! eca :recipe (:fetcher github :repo "editor-code-assistant/eca-emacs" :files ("*.el")))
 ```
 
 ## Quickstart
