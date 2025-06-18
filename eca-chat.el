@@ -48,8 +48,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defcustom eca-chat-custom-behavior nil
   "Which chat behavior to use, if nil let server decide."
   :type '(choice (const :tag "Agent, let server make changes as a co-pilot." agent)
-                 (const :tag "Ask, let server just answer questions." ask)
-                 (const :tag "Manual, let server suggest changes which require user approval." manual))
+                 (const :tag "Chat, ask questions and suggestions without changes." chat))
   :group 'eca)
 
 (defface eca-chat-prompt-prefix-face

@@ -40,16 +40,6 @@ M-x package-install eca
 3. Type your prompt after the `> ` and press RET.
 4. Attach more context auto completing after the `@`.
 
-## Configuration
-
-Above are the most relevant configs one may want change:
-
-```elisp
-(setq eca-chat-custom-behavior 'auto
-      eca-chat-window-width 50
-      eca-custom-command '("eca" "server"))
-```
-
 ## Roadmap
 
 - Improve docs.
