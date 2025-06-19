@@ -313,7 +313,7 @@ If not provided, download and start eca automatically."
 
 ;;;###autoload
 (defun eca ()
-  "Start or switch an eca session."
+  "Start or switch to a eca session."
   (interactive)
   (unless eca--session
     (setq eca--session (eca-create-session)))
