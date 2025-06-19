@@ -127,11 +127,14 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
          0
          0.5
          (lambda ()
-           (with-current-buffer (eca-chat--get-buffer)
-             (if (eq 3 (length eca-chat--spinner-string))
-                 (setq eca-chat--spinner-string ".")
-               (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
-             (force-mode-line-update))))))
+           (if-let ((buffer  (eca-chat--get-buffer)))
+               (with-current-buffer buffer
+                 (if (eq 3 (length eca-chat--spinner-string))
+                     (setq eca-chat--spinner-string ".")
+                   (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
+                 (force-mode-line-update))
+             (when eca-chat--spinner-timer
+               (cancel-timer eca-chat--spinner-timer)))))))
 
 (defun eca-chat--spinner-stop ()
   "Stop modeline spinner."
@@ -519,7 +522,8 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (with-current-buffer (eca-chat--get-buffer)
       (goto-char (point-max))
       (setq-local mode-line-format `(,(propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face)))
-      (rename-buffer (concat (buffer-name) ":closed") t))))
+      (rename-buffer (concat (buffer-name) ":closed") t)
+      (quit-window nil (get-buffer-window (eca-chat--get-buffer))))))
 
 ;;;###autoload
 (defun eca-chat-clear ()
