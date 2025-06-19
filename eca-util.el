@@ -48,8 +48,14 @@
   ;; The suported models by the server.
   (models '())
 
-  ;; The chat behavior like agent, manual, ask.
-  (chat-behavior nil)
+  ;; Default model to use in the chat returned by server.
+  (chat-default-model nil)
+
+  ;; The supported chat behaviors by the server.
+  (chat-behaviors nil)
+
+  ;; Default behavior to use in the chat returned by server.
+  (chat-default-behavior nil)
 
   ;; The welcome message for new chats.
   (chat-welcome-message ""))

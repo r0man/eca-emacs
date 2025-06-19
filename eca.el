@@ -301,11 +301,17 @@ If not provided, download and start eca automatically."
                                                                   (list :uri (eca--path-to-uri folder)
                                                                         :name (file-name-nondirectory (directory-file-name folder))))
                                                                 (eca--session-workspace-folders eca--session))))
-                 :success-callback (-lambda ((&plist :chatWelcomeMessage msg :chatBehavior chat-behavior :models models))
+                 :success-callback (-lambda ((&plist :chatWelcomeMessage msg
+                                                     :chatBehaviors chat-behaviors
+                                                     :chatDefaultBehavior chat-default-behavior
+                                                     :chatDefaultModel chat-default-model
+                                                     :models models))
                                      (setf (eca--session-status eca--session) 'started)
                                      (setf (eca--session-chat-welcome-message eca--session) msg)
                                      (setf (eca--session-models eca--session) models)
-                                     (setf (eca--session-chat-behavior eca--session) chat-behavior)
+                                     (setf (eca--session-chat-behaviors eca--session) chat-behaviors)
+                                     (setf (eca--session-chat-default-model eca--session) chat-default-model)
+                                     (setf (eca--session-chat-default-behavior eca--session) chat-default-behavior)
                                      (eca-info "Started!")
                                      (eca-chat-open)
                                      (run-hooks 'eca-after-initialize-hook)))))

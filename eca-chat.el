@@ -24,14 +24,14 @@
   :type 'hook
   :group 'eca)
 
-(defcustom eca-chat-window-width 0.4
+(defcustom eca-chat-window-width 0.35
   "The width of `eca' dedicated chat window."
   :type 'integer
   :group 'eca)
 
-(defcustom eca-chat-position-params '((display-buffer-in-side-window)
+(defcustom eca-chat-position-params `((display-buffer-in-side-window)
                                       (side . right)
-                                      (window-width . 0.4))
+                                      (window-width . ,eca-chat-window-width))
   "Position params for each chat display."
   :type 'alist
   :group 'eca)
@@ -46,16 +46,15 @@
   :type 'string
   :group 'eca)
 
-(defcustom eca-chat-model nil
-  "Which model to use during chat, nil means auto, let server decide.
+(defcustom eca-chat-custom-model nil
+  "Which model to use during chat, nil means use server's default.
 Must be a valid model supported by server, check `eca-chat-select-model`."
   :type 'string
   :group 'eca)
 
 (defcustom eca-chat-custom-behavior nil
-  "Which chat behavior to use, if nil let server decide."
-  :type '(choice (const :tag "Agent, let server make changes as a co-pilot." agent)
-                 (const :tag "Chat, ask questions and suggestions without changes." chat))
+  "Which chat behavior to use, if nil use server's default."
+  :type 'string
   :group 'eca)
 
 (defface eca-chat-prompt-prefix-face
@@ -144,7 +143,12 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defun eca-chat--behavior ()
   "The chat behavior considering what's in session and user option."
   (or eca-chat-custom-behavior
-      (eca--session-chat-behavior eca--session)))
+      (eca--session-chat-default-behavior eca--session)))
+
+(defun eca-chat--model ()
+  "The chat model considering what's in session and user option."
+  (or eca-chat-custom-model
+      (eca--session-chat-default-model eca--session)))
 
 (defun eca-chat--insert-prompt-string ()
   "Insert the prompt and context string adding overlay metadatas."
@@ -233,7 +237,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
        :params (list :message prompt
                      :request-id (cl-incf eca-chat--last-request-id)
                      :chatId eca-chat--id
-                     :model (when eca-chat-model eca-chat-model)
+                     :model (eca-chat--model)
                      :behavior (eca-chat--behavior)
                      :contexts (eca-chat--contexts->request))
        :success-callback (-lambda (res)
@@ -247,12 +251,27 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
 (defun eca-chat--header-line-string ()
   "Update chat header line."
-  (let ((model-str (or eca-chat-model "auto")))
-    (list (propertize "model:" 'font-lock-face 'eca-chat-option-key-face)
-          (propertize model-str 'font-lock-face 'eca-chat-option-value-face)
+  (let ((model-keymap (make-sparse-keymap))
+        (behavior-keymap (make-sparse-keymap)))
+    (define-key model-keymap (kbd "<header-line> <mouse-1>") #'eca-chat-select-model)
+    (define-key behavior-keymap (kbd "<header-line> <mouse-1>") #'eca-chat-select-behavior)
+    (list (propertize "model:"
+                      'font-lock-face 'eca-chat-option-key-face
+                      'pointer 'hand
+                      'keymap model-keymap)
+          (propertize (eca-chat--model)
+                      'font-lock-face 'eca-chat-option-value-face
+                      'pointer 'hand
+                      'keymap model-keymap)
           "  "
-          (propertize "behavior:" 'font-lock-face 'eca-chat-option-key-face)
-          (propertize (eca--session-chat-behavior eca--session) 'font-lock-face 'eca-chat-option-value-face))))
+          (propertize "behavior:"
+                      'font-lock-face 'eca-chat-option-key-face
+                      'pointer 'hand
+                      'keymap behavior-keymap)
+          (propertize (eca-chat--behavior)
+                      'font-lock-face 'eca-chat-option-value-face
+                      'pointer 'hand
+                      'keymap behavior-keymap))))
 
 (defun eca-chat--mode-line-string ()
   "Update chat mode line."
@@ -512,10 +531,15 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-select-model ()
   "Select which model to use in the chat from what server supports."
   (interactive)
-  (when-let ((model (completing-read "Select a model:" (append '(auto) (append (eca--session-models eca--session) nil)) nil t)))
-    (if (string= "auto" model)
-        (setq eca-chat-model nil)
-      (setq eca-chat-model model))))
+  (when-let ((model (completing-read "Select a model:" (append (eca--session-models eca--session) nil) nil t)))
+    (setq eca-chat-custom-model model)))
+
+;;;###autoload
+(defun eca-chat-select-behavior ()
+  "Select which chat behavior to use from what server supports."
+  (interactive)
+  (when-let ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
+    (setq eca-chat-custom-behavior behavior)))
 
 (provide 'eca-chat)
 ;;; eca-chat.el ends here
