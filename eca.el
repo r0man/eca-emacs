@@ -104,6 +104,9 @@ If not provided, download and start eca automatically."
 
 ;; Internal
 
+(defvar eca--process-buffer-name "<eca>")
+(defvar eca--process-stderr-buffer-name "<eca:stderr>")
+
 (defun eca--path-to-uri (path)
   "Convert a PATH to a uri."
   (concat "file://"
@@ -265,24 +268,21 @@ If not provided, download and start eca automatically."
   "Start the eca process."
   (unless (process-live-p (eca--session-process eca--session))
     (eca-info "Starting process...")
-    (let ((stderr-buffer (get-buffer-create "*eca:stderr*")))
-      (with-current-buffer stderr-buffer
-        (delete-region (point-min) (point-max)))
-      (setf (eca--session-process eca--session)
-            (make-process
-             :coding 'no-conversion
-             :connection-type 'pipe
-             :name "eca"
-             :command (eca--server-command)
-             :buffer "*eca*"
-             :stderr stderr-buffer
-             :filter #'eca--process-filter
-             :sentinel (lambda (process exit-str)
-                         (unless (process-live-p process)
-                           (setq eca--session nil)
-                           (eca-info "process has exited (%s)" exit-str)))
-             :file-handler t
-             :noquery t)))))
+    (setf (eca--session-process eca--session)
+          (make-process
+           :coding 'no-conversion
+           :connection-type 'pipe
+           :name "eca"
+           :command (eca--server-command)
+           :buffer eca--process-buffer-name
+           :stderr (get-buffer-create (generate-new-buffer-name eca--process-stderr-buffer-name))
+           :filter #'eca--process-filter
+           :sentinel (lambda (process exit-str)
+                       (unless (process-live-p process)
+                         (setq eca--session nil)
+                         (eca-info "process has exited (%s)" exit-str)))
+           :file-handler t
+           :noquery t))))
 
 (defun eca--initialize ()
   "Sent the initialize request."
@@ -330,7 +330,7 @@ If not provided, download and start eca automatically."
     (eca-api-request-sync :method "shutdown")
     (eca-api-notify :method "exit")
     (kill-process (eca--session-process eca--session))
-    (kill-buffer "*eca*"))
+    (kill-buffer eca--process-buffer-name))
   (eca-chat-exit)
   (setq eca--session nil))
 

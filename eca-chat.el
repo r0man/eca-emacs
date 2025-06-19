@@ -24,9 +24,16 @@
   :type 'hook
   :group 'eca)
 
-(defcustom eca-chat-window-width 50
+(defcustom eca-chat-window-width 0.4
   "The width of `eca' dedicated chat window."
   :type 'integer
+  :group 'eca)
+
+(defcustom eca-chat-position-params '((display-buffer-in-side-window)
+                                      (side . right)
+                                      (window-width . 0.4))
+  "Position params for each chat display."
+  :type 'alist
   :group 'eca)
 
 (defcustom eca-chat-prompt-prefix "> "
@@ -102,7 +109,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--spinner-timer nil)
 (defvar-local eca-chat--progress-text "")
 
-(defvar eca-chat-buffer-name "*eca-chat*")
+(defvar eca-chat-buffer-name "<eca-chat>")
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
@@ -121,7 +128,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
          0
          0.5
          (lambda ()
-           (with-current-buffer (eca-chat--get-or-create-buffer)
+           (with-current-buffer (eca-chat--get-buffer)
              (if (eq 3 (length eca-chat--spinner-string))
                  (setq eca-chat--spinner-string ".")
                (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
@@ -153,8 +160,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defun eca-chat--clear ()
   "Clear the chat."
-  (with-current-buffer (eca-chat--get-or-create-buffer)
-    (delete-region (point-min) (point-max))
+  (with-current-buffer (eca-chat--get-buffer)
+    (erase-buffer)
     (remove-overlays (point-min) (point-max))
     (insert "\n")
     (eca-chat--insert-prompt-string)
@@ -251,9 +258,13 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   "Update chat mode line."
   (concat eca-chat--progress-text eca-chat--spinner-string))
 
-(defun eca-chat--get-or-create-buffer ()
-  "Get the eca chat buffer for current project."
-  (get-buffer-create eca-chat-buffer-name))
+(defun eca-chat--get-buffer ()
+  "Get the eca chat buffer for current session."
+  (get-buffer eca-chat-buffer-name))
+
+(defun eca-chat--create-buffer ()
+  "Create the eca chat buffer for current session."
+  (get-buffer-create (generate-new-buffer-name eca-chat-buffer-name)))
 
 (defun eca-chat--select-window ()
   "Select the Window."
@@ -262,10 +273,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat--pop-window ()
   "Pop eca dedicated window if it exists."
   (let ((buffer (current-buffer)))
-    (display-buffer buffer
-                   '((display-buffer-in-side-window)
-                     (side . right)
-                     (window-width . ,eca-chat-window-width)))
+    (display-buffer buffer eca-chat-position-params)
     (select-window (get-buffer-window buffer))
     (set-window-buffer (get-buffer-window buffer) buffer)))
 
@@ -395,7 +403,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
    0.05
    nil
    (lambda ()
-     (with-current-buffer (eca-chat--get-or-create-buffer)
+     (with-current-buffer (eca-chat--get-buffer)
        (display-line-numbers-mode -1)
        (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
        (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
@@ -443,7 +451,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
          (state (plist-get content :state))
          (type (plist-get content :type))
          (text (plist-get content :text)))
-    (with-current-buffer (eca-chat--get-or-create-buffer)
+    (with-current-buffer (eca-chat--get-buffer)
       (pcase type
         ("text" (when text
                   (pcase role
@@ -474,10 +482,11 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
   (let ((source-buffer (current-buffer)))
-    (unless (buffer-live-p (get-buffer eca-chat-buffer-name))
-      (with-current-buffer (eca-chat--get-or-create-buffer)
-        (eca-chat-mode)))
-    (with-current-buffer (eca-chat--get-or-create-buffer)
+    (unless (buffer-live-p (eca-chat--get-buffer))
+      (eca-chat--create-buffer))
+    (with-current-buffer (eca-chat--get-buffer)
+      (unless (derived-mode-p 'eca-chat-mode)
+        (eca-chat-mode))
       (unless (eca--session-chat eca--session)
         (setf (eca--session-chat eca--session) (current-buffer)))
       (eca-chat--add-context "file" (buffer-file-name source-buffer))
@@ -488,7 +497,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-exit ()
   "Exit the ECA chat."
   (when (buffer-live-p (get-buffer eca-chat-buffer-name))
-    (with-current-buffer (eca-chat--get-or-create-buffer)
+    (with-current-buffer (eca-chat--get-buffer)
       (goto-char (point-max))
       (setq-local mode-line-format `(,(propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face)))
       (rename-buffer (concat (buffer-name) ":closed") t))))
