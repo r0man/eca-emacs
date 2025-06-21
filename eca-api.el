@@ -95,7 +95,7 @@ Call SUCCESS-CALLBACK when success or ERROR-CALLBACK when error."
            (if expected-time (- expected-time send-time) 1))))
       (setq send-time (float-time))
       (when (and expected-time (< expected-time send-time))
-        (error "Timeout while waiting for response. Method: %s" method)))
+        (error "Timeout while waiting for response.  Method: %s" method)))
     (cond
      ((eq resp-result :finished) nil)
      (resp-result resp-result)

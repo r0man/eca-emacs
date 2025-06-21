@@ -1,11 +1,11 @@
-;;; eca.el --- AI pair programming via ECA (Editor Code Assistant) -*- lexical-binding: t; -*-
+;;; eca.el --- The ECA (Editor Code Assistant) client for Emacs -*- lexical-binding: t; -*-
 ;; Copyright (C) 2025 Eric Dallo
 ;; Author: Eric Dallo <ercdll1337@gmail.com>
 ;; Maintainer: Eric Dallo <ercdll1337@gmail.com>
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "28.1") (dash "2.18.0") (f "0.20.0") (markdown-mode "2.3"))
-;; Keywords: ai emacs llm eca ai-pair-programming tools
-;; Homepage: https://github.com/ericdallo/eca-emacs
+;; Keywords: tools
+;; Homepage: https://github.com/editor-code-assistant/eca-emacs
 ;;
 ;; SPDX-License-Identifier: Apache-2.0
 ;;
@@ -14,7 +14,7 @@
 ;;; Commentary:
 ;;
 ;;  The ECA (Editor Code Assistant) client for Emacs to
-;;  add AI code assistant tools. Heavily insipired on
+;;  add AI code assistant tools.  Heavily insipired on
 ;;  lsp-mode for parsing and handling jsonrpc messages.
 ;;
 ;;; Code:
