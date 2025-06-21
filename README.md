@@ -16,8 +16,8 @@ For more details about ECA, check [ECA server](https://github.com/editor-code-as
 
 - Emacs 28.1 or later
 - External `eca` server binary
+  - Automatic downloaded if `eca-custom-command` is `nil`
   - Place it on your `$PATH` or customize `eca-custom-command`
-  - (Planned: automatic download in a future release)
 
 ## Installation
 
@@ -36,19 +36,9 @@ M-x package-install eca
 ## Quickstart
 
 1. Run `M-x eca` to start the eca process and initialize the workspace.
-2. The dedicated chat window `*eca-chat*` pops up.
+2. The dedicated chat window `<eca-chat>` pops up.
 3. Type your prompt after the `> ` and press RET.
 4. Attach more context auto completing after the `@`.
-
-## Roadmap
-
-- Improve docs.
-- Error handling
-- Improve add context 
-- Multi session/projects support.
-- transient support.
-- Auto edit files support (agent). (depends on server)
-- Code completion (depends on server)
 
 ## Contributing
 
