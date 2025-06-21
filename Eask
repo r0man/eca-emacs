@@ -1,4 +1,4 @@
-(package "eca" "0.0.1" "The ECA (Editor Code Assistant) client for Emacs")
+(package "eca" "0.0.1" "AI pair programming via ECA (Editor Code Assistant)")
 (website-url "https://github.com/editor-code-assistant/eca-emacs")
 (keywords "tools")
 

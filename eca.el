@@ -1,4 +1,4 @@
-;;; eca.el --- The ECA (Editor Code Assistant) client for Emacs -*- lexical-binding: t; -*-
+;;; eca.el --- AI pair programming via ECA (Editor Code Assistant) -*- lexical-binding: t; -*-
 ;; Copyright (C) 2025 Eric Dallo
 ;; Author: Eric Dallo <ercdll1337@gmail.com>
 ;; Maintainer: Eric Dallo <ercdll1337@gmail.com>
