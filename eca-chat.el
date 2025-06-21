@@ -127,14 +127,12 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
          0
          0.5
          (lambda ()
-           (if-let ((buffer  (eca-chat--get-buffer)))
-               (with-current-buffer buffer
-                 (if (eq 3 (length eca-chat--spinner-string))
-                     (setq eca-chat--spinner-string ".")
-                   (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
-                 (force-mode-line-update))
-             (when eca-chat--spinner-timer
-               (cancel-timer eca-chat--spinner-timer)))))))
+           (when eca-chat--spinner-timer
+             (with-current-buffer (eca-chat--get-buffer)
+               (if (eq 3 (length eca-chat--spinner-string))
+                   (setq eca-chat--spinner-string ".")
+                 (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
+               (force-mode-line-update)))))))
 
 (defun eca-chat--spinner-stop ()
   "Stop modeline spinner."
