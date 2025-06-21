@@ -83,7 +83,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :group 'eca)
 
 (defface eca-chat-welcome-face
-  '((t :inherit font-lock-builtin-face :weight bold))
+  '((t :inherit font-lock-builtin-face))
   "Face for the welcome message in chat."
   :group 'eca)
 
