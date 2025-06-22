@@ -30,7 +30,7 @@ M-x package-install eca
 ### Doom Emacs:
 
 ```elisp
-(package! eca :recipe (:fetcher github :repo "editor-code-assistant/eca-emacs" :files ("*.el")))
+(package! eca :recipe (:host github :repo "editor-code-assistant/eca-emacs" :files ("*.el")))
 ```
 
 ## Quickstart
