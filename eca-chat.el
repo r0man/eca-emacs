@@ -82,6 +82,16 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for the system messages in chat."
   :group 'eca)
 
+(defface eca-chat-mcp-tool-call-face
+  '((t :inherit font-lock-keyword-face))
+  "Face for the MCP tool calls in chat."
+  :group 'eca)
+
+(defface eca-chat-mcp-tool-call-name-face
+  '((t :inherit eca-chat-mcp-tool-call-face :underline t))
+  "Face for the MCP tool calls's name in chat."
+  :group 'eca)
+
 (defface eca-chat-welcome-face
   '((t :inherit font-lock-builtin-face))
   "Face for the welcome message in chat."
@@ -116,6 +126,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "DEL") #'eca-chat--backward-delete-char)
     (define-key map (kbd "S-<return>") #'eca-chat--send-newline)
     (define-key map (kbd "S-<return>") #'eca-chat--send-newline)
+    (define-key map (kbd "C-k") #'eca-chat-clear)
     (define-key map (kbd "<return>") #'eca-chat--send-return)
     map)
   "Keymap used by `eca-chat-mode'.")
@@ -489,6 +500,15 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                                              'font-lock-face 'eca-chat-system-messages-face))))
                     (_ (progn
                          (eca-chat--add-content text))))))
+        ("mcpToolCall" (let ((name (plist-get content :name)))
+                           (eca-chat--add-content
+                            (format (propertize "%s %s\n"
+                                                'line-spacing 10)
+                                    (propertize "Calling MCP tool"
+                                                'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-mcp-tool-call-face)
+                                                'font-lock-face 'eca-chat-mcp-tool-call-face)
+                                    (propertize name
+                                                'font-lock-face 'eca-chat-mcp-tool-call-name-face)))))
         ("progress" (pcase state
                       ("running" (progn
                                    (unless eca-chat--spinner-timer
