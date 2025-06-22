@@ -216,7 +216,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
            context-item)
         (setq-local eca-chat--context (delete context-item eca-chat--context))
         (eca-chat--refresh-context)
-        (goto-char (line-end-position)))
+        (end-of-line))
 
      ((and cur-ov
            (<= (point) (overlay-start cur-ov)))
@@ -259,7 +259,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   "Return non-nil if point is at the context area."
   (and (eq (line-number-at-pos (point))
            (line-number-at-pos (eca-chat--prompt-area-start-point)))
-       (eq (point) (line-end-position))))
+       (eolp)))
 
 (defun eca-chat--header-line-string ()
   "Update chat header line."
@@ -386,7 +386,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (pcase type
       ("file" (eca-chat--add-context type path))
       ("directory" (eca-chat--add-context type path))))
-  (goto-char (line-end-position)))
+  (end-of-line))
 
 (defun eca-chat--context-to-completion (context)
   "Convert CONTEXT to a completion item."
@@ -403,11 +403,8 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 \\{eca-chat-mode-map}"
   :group 'eca
   (setq major-mode 'eca-chat-mode)
-  (setq mode-name "eca-chat")
   (visual-line-mode)
   (hl-line-mode -1)
-  ;; (buffer-disable-undo)
-  (use-local-map eca-chat-mode-map)
   (setq-local eca-chat--history '())
   (setq-local eca-chat--history-index 0)
 
