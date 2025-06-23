@@ -479,7 +479,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
          (content (plist-get params :content)))
     (with-current-buffer (eca-chat--get-buffer)
       (pcase (plist-get content :type)
-        ("text" (when-let ((text (plist-get content :text)))
+        ("text" (when-let* ((text (plist-get content :text)))
                   (pcase role
                     ("user" (progn
                               (eca-chat--add-content
@@ -556,14 +556,14 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-select-model ()
   "Select which model to use in the chat from what server supports."
   (interactive)
-  (when-let ((model (completing-read "Select a model:" (append (eca--session-models eca--session) nil) nil t)))
+  (when-let* ((model (completing-read "Select a model:" (append (eca--session-models eca--session) nil) nil t)))
     (setq eca-chat-custom-model model)))
 
 ;;;###autoload
 (defun eca-chat-select-behavior ()
   "Select which chat behavior to use from what server supports."
   (interactive)
-  (when-let ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
+  (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
     (setq eca-chat-custom-behavior behavior)))
 
 (provide 'eca-chat)
