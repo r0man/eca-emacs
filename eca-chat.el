@@ -13,6 +13,7 @@
 
 (require 'f)
 (require 'markdown-mode)
+(require 'compat)
 
 (require 'eca-util)
 (require 'eca-api)
@@ -475,13 +476,10 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-content-received (params)
   "Handle the content received notification with PARAMS."
   (let* ((role (plist-get params :role))
-         (content (plist-get params :content))
-         (state (plist-get content :state))
-         (type (plist-get content :type))
-         (text (plist-get content :text)))
+         (content (plist-get params :content)))
     (with-current-buffer (eca-chat--get-buffer)
-      (pcase type
-        ("text" (when text
+      (pcase (plist-get content :type)
+        ("text" (when-let ((text (plist-get content :text)))
                   (pcase role
                     ("user" (progn
                               (eca-chat--add-content
@@ -495,22 +493,30 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                                  (propertize text
                                              'line-height 20
                                              'font-lock-face 'eca-chat-system-messages-face))))
-                    (_ (progn
-                         (eca-chat--add-content text))))))
+                    (_ (eca-chat--add-content text)))))
+        ("url" (eca-chat--add-content
+                (concat
+                 "\n"
+                 (buttonize
+                  (concat "🌐" (plist-get content :title))
+                  (lambda(_) (browse-url (plist-get content :url)))
+                  nil
+                  (plist-get content :url))
+                 "\n")))
         ("mcpToolCall" (let ((name (plist-get content :name)))
-                           (eca-chat--add-content
-                            (format (propertize "\n%s %s\n"
-                                                'line-spacing 10)
-                                    (propertize "Calling MCP tool"
-                                                'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-mcp-tool-call-face)
-                                                'font-lock-face 'eca-chat-mcp-tool-call-face)
-                                    (propertize name
-                                                'font-lock-face 'eca-chat-mcp-tool-call-name-face)))))
-        ("progress" (pcase state
+                         (eca-chat--add-content
+                          (format (propertize "\n%s %s\n"
+                                              'line-spacing 10)
+                                  (propertize "Calling MCP tool"
+                                              'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-mcp-tool-call-face)
+                                              'font-lock-face 'eca-chat-mcp-tool-call-face)
+                                  (propertize name
+                                              'font-lock-face 'eca-chat-mcp-tool-call-name-face)))))
+        ("progress" (pcase (plist-get content :state)
                       ("running" (progn
                                    (unless eca-chat--spinner-timer
                                      (eca-chat--spinner-start))
-                                   (setq-local eca-chat--progress-text (propertize text 'font-lock-face 'eca-chat-system-messages-face))))
+                                   (setq-local eca-chat--progress-text (propertize (plist-get content :text) 'font-lock-face 'eca-chat-system-messages-face))))
                       ("finished" (progn
                                     (eca-chat--spinner-stop)
                                     (eca-chat--add-content (propertize "\n" 'line-spacing 10))

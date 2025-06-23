@@ -10,6 +10,7 @@
 (source "melpa")
 
 (depends-on "emacs" "28.1")
+(depends-on "compat" "30.1")
 (depends-on "dash" "2.18.0")
 (depends-on "f" "0.20.0")
 (depends-on "markdown-mode" "2.3")
