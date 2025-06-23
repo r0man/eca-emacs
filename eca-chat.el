@@ -65,12 +65,12 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defface eca-chat-context-unlinked-face
   '((t (:foreground "gold")))
-  "Face for the `eca-chat-context-prefix`."
+  "Face for contexts to be added."
   :group 'eca)
 
-(defface eca-chat-context-linked-face
-  '((t (:inherit eca-chat-context-unlinked-face :underline t)))
-  "Face for the `eca-chat-context-prefix`."
+(defface eca-chat-context-file-face
+  '((t (:foreground "coral" :underline t)))
+  "Face for contexts of file type."
   :group 'eca)
 
 (defface eca-chat-user-messages-face
@@ -123,12 +123,12 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<backspace>") #'eca-chat--backward-delete-char)
-    (define-key map (kbd "DEL") #'eca-chat--backward-delete-char)
-    (define-key map (kbd "S-<return>") #'eca-chat--send-newline)
-    (define-key map (kbd "S-<return>") #'eca-chat--send-newline)
+    (define-key map (kbd "<backspace>") #'eca-chat--key-pressed-backspace)
+    (define-key map (kbd "DEL") #'eca-chat--key-pressed-backspace)
+    (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
+    (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "C-k") #'eca-chat-clear)
-    (define-key map (kbd "<return>") #'eca-chat--send-return)
+    (define-key map (kbd "<return>") #'eca-chat--key-pressed-return)
     map)
   "Keymap used by `eca-chat-mode'.")
 
@@ -184,7 +184,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (eca-chat--insert-prompt-string)
     (eca-chat--refresh-context)))
 
-(defun eca-chat--send-newline ()
+(defun eca-chat--key-pressed-newline ()
   "Insert a newline character at point."
   (interactive)
   (when (eq (line-beginning-position) (eca-chat--prompt-field-start-point))
@@ -203,7 +203,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
               (overlays-in (point-min) (point-max)))
     (overlay-start)))
 
-(defun eca-chat--backward-delete-char ()
+(defun eca-chat--key-pressed-backspace ()
   "Delete the character before point, unless at the prompt or context boundary.
 Checks if it's in a context, removing it if so.
 This is similar to `backward-delete-char' but protects the prompt/context line."
@@ -232,7 +232,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
      (t (delete-char -1)))))
 
-(defun eca-chat--send-return ()
+(defun eca-chat--key-pressed-return ()
   "Send the current prompt to eca process if in prompt."
   (interactive)
   (let* ((prompt-start (eca-chat--prompt-field-start-point))
@@ -338,12 +338,12 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
           ("file" (let ((text (concat eca-chat-context-prefix (f-filename value))))
                     (insert (propertize text
                                         'eca-chat-context-item context
-                                        'font-lock-face 'eca-chat-context-linked-face))
+                                        'font-lock-face 'eca-chat-context-file-face))
                     (insert " ")))
           ("directory" (let ((text (concat eca-chat-context-prefix (f-filename value))))
                          (insert (propertize text
                                              'eca-chat-context-item context
-                                             'font-lock-face 'eca-chat-context-linked-face))
+                                             'font-lock-face 'eca-chat-context-file-face))
                          (insert " "))))))
     (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-unlinked-face))))
 
