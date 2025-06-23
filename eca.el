@@ -280,7 +280,7 @@ If not provided, download and start eca automatically."
            :sentinel (lambda (process exit-str)
                        (unless (process-live-p process)
                          (setq eca--session nil)
-                         (eca-info "process has exited (%s)" exit-str)))
+                         (eca-info "process has exited (%s)" (s-trim exit-str))))
            :file-handler t
            :noquery t))))
 
