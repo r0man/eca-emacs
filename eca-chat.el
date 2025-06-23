@@ -89,7 +89,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :group 'eca)
 
 (defface eca-chat-mcp-tool-call-name-face
-  '((t :inherit eca-chat-mcp-tool-call-face :underline t))
+  '((t :inherit eca-chat-mcp-tool-call-face :weight bold))
   "Face for the MCP tool calls's name in chat."
   :group 'eca)
 
