@@ -118,6 +118,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--spinner-string "")
 (defvar-local eca-chat--spinner-timer nil)
 (defvar-local eca-chat--progress-text "")
+(defvar-local eca-chat--last-user-message-pos nil)
 
 (defvar eca-chat-buffer-name "<eca-chat>")
 
@@ -309,13 +310,28 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (select-window (get-buffer-window buffer))
     (set-window-buffer (get-buffer-window buffer) buffer)))
 
-(defun eca-chat--add-content (content)
-  "Add CONTENT to the chat."
+(defun eca-chat--mark-header ()
+  "Mark last messages header."
   (let ((context-start (eca-chat--prompt-area-start-point)))
     (save-excursion
       (goto-char context-start)
       (goto-char (1- (point)))
-      (insert content)
+      (setq-local eca-chat--last-user-message-pos (point)))))
+
+(defun eca-chat--add-header (content)
+  "Add CONTENT to the chat just after last user input."
+  (when eca-chat--last-user-message-pos
+    (save-excursion
+      (goto-char eca-chat--last-user-message-pos)
+      (insert content))))
+
+(defun eca-chat--add-text (text)
+  "Add TEXT to the chat current position."
+  (let ((context-start (eca-chat--prompt-area-start-point)))
+    (save-excursion
+      (goto-char context-start)
+      (goto-char (1- (point)))
+      (insert text)
       (point))))
 
 (defun eca-chat--relativize-filename-for-workspace-root (filename roots)
@@ -482,29 +498,30 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
         ("text" (when-let* ((text (plist-get content :text)))
                   (pcase role
                     ("user" (progn
-                              (eca-chat--add-content
+                              (eca-chat--add-text
                                (propertize text
                                            'font-lock-face 'eca-chat-user-messages-face
                                            'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-user-messages-face)
                                            'line-spacing 10))
+                              (eca-chat--mark-header)
                               (font-lock-ensure)))
                     ("system" (progn
-                                (eca-chat--add-content
+                                (eca-chat--add-text
                                  (propertize text
                                              'line-height 20
                                              'font-lock-face 'eca-chat-system-messages-face))))
-                    (_ (eca-chat--add-content text)))))
-        ("url" (eca-chat--add-content
+                    (_ (eca-chat--add-text text)))))
+        ("url" (eca-chat--add-header
                 (concat
-                 "\n"
+                 "🌐 "
                  (buttonize
-                  (concat "🌐" (plist-get content :title))
+                  (plist-get content :title)
                   (lambda(_) (browse-url (plist-get content :url)))
                   nil
                   (plist-get content :url))
-                 "\n")))
+                 "\n\n")))
         ("mcpToolCall" (let ((name (plist-get content :name)))
-                         (eca-chat--add-content
+                         (eca-chat--add-text
                           (format (propertize "\n%s %s\n"
                                               'line-spacing 10)
                                   (propertize "Calling MCP tool"
@@ -519,7 +536,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                                    (setq-local eca-chat--progress-text (propertize (plist-get content :text) 'font-lock-face 'eca-chat-system-messages-face))))
                       ("finished" (progn
                                     (eca-chat--spinner-stop)
-                                    (eca-chat--add-content (propertize "\n" 'line-spacing 10))
+                                    (eca-chat--add-text (propertize "\n" 'line-spacing 10))
                                     (setq-local eca-chat--progress-text "")))))))))
 
 (defun eca-chat-open ()
