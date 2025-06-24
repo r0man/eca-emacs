@@ -124,8 +124,8 @@ If not provided, download and start eca automatically."
           'response))
     'notification))
 
-(defun eca--download-server ()
-  "Download eca server."
+(defun eca--download-server (on-downloaded)
+  "Download eca server calling ON-DOWNLOADED when success."
   (let* ((url eca-server-download-url)
          (store-path eca-server-install-path)
          (download-path (concat store-path ".zip")))
@@ -135,21 +135,20 @@ If not provided, download and start eca automatically."
            (progn
              (when (f-exists? download-path) (f-delete download-path))
              (when (f-exists? store-path) (f-delete store-path))
-             (eca-info "Starting to download eca to %s..." download-path)
+             (eca-info "Downloading eca server to %s..." download-path)
              (mkdir (f-parent download-path) t)
-             (url-copy-file url download-path)
+             (let ((inhibit-message t))
+               (url-copy-file url download-path))
              (unless eca-unzip-script
                (error "Unable to find `unzip' or `powershell' on the path, please customize `eca-unzip-script'"))
              (shell-command (format (funcall eca-unzip-script) download-path (f-parent store-path)))
-             (eca-info "Downloaded eca successfully"))
+             (eca-info "Downloaded eca successfully")
+             (funcall on-downloaded))
          (error "Could not download eca server" err))))))
 
 (defun eca--server-command ()
-  "Build the eca server command downloading server if not provided."
+  "Return the command to start server."
   (or eca-custom-command
-      (unless (f-exists? eca-server-install-path)
-        (eca--download-server)
-        nil)
       (list eca-server-install-path "server")))
 
 (defun eca--parse-header (s)
@@ -264,25 +263,31 @@ If not provided, download and start eca automatically."
               (eca--handle-message msg))
             (nreverse messages)))))
 
-(defun eca--start-process ()
-  "Start the eca process."
+(defun eca--start-process (on-start)
+  "Start the eca process calling ON-START after."
   (unless (process-live-p (eca--session-process eca--session))
-    (eca-info "Starting process...")
-    (setf (eca--session-process eca--session)
-          (make-process
-           :coding 'no-conversion
-           :connection-type 'pipe
-           :name "eca"
-           :command (eca--server-command)
-           :buffer eca--process-buffer-name
-           :stderr (get-buffer-create eca--process-stderr-buffer-name)
-           :filter #'eca--process-filter
-           :sentinel (lambda (process exit-str)
-                       (unless (process-live-p process)
-                         (setq eca--session nil)
-                         (eca-info "process has exited (%s)" (s-trim exit-str))))
-           :file-handler t
-           :noquery t))))
+    (let ((start-process-fn (lambda ()
+                              (eca-info "Starting process...")
+                              (setf (eca--session-process eca--session)
+                                    (make-process
+                                     :coding 'no-conversion
+                                     :connection-type 'pipe
+                                     :name "eca"
+                                     :command (eca--server-command)
+                                     :buffer eca--process-buffer-name
+                                     :stderr (get-buffer-create eca--process-stderr-buffer-name)
+                                     :filter #'eca--process-filter
+                                     :sentinel (lambda (process exit-str)
+                                                 (unless (process-live-p process)
+                                                   (setq eca--session nil)
+                                                   (eca-info "process has exited (%s)" (s-trim exit-str))))
+                                     :file-handler t
+                                     :noquery t))
+                              (funcall on-start))))
+      (if (f-exists? eca-server-install-path)
+          (funcall start-process-fn)
+        (eca--download-server (lambda ()
+                                (funcall start-process-fn)))))))
 
 (defun eca--initialize ()
   "Sent the initialize request."
@@ -324,8 +329,8 @@ If not provided, download and start eca automatically."
   (interactive)
   (unless eca--session
     (setq eca--session (eca-create-session)))
-  (eca--start-process)
-  (eca--initialize))
+  (eca--start-process (lambda ()
+                        (eca--initialize))))
 
 ;;;###autoload
 (defun eca-stop ()

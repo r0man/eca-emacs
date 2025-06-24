@@ -36,6 +36,7 @@ M-x package-install eca
 ## Quickstart
 
 1. Run `M-x eca` to start the eca process and initialize the workspace.
+  - eca-emacs will download `eca` automatically and cache it, or use `eca-custom-command` to start server.
 2. The dedicated chat window `<eca-chat>` pops up.
 3. Type your prompt after the `> ` and press RET.
 4. Attach more context auto completing after the `@`.
