@@ -149,6 +149,8 @@ If not provided, download and start eca automatically."
 (defun eca--server-command ()
   "Return the command to start server."
   (or eca-custom-command
+      (when-let* ((command (executable-find "eca")))
+        (list command "server"))
       (list eca-server-install-path "server")))
 
 (defun eca--parse-header (s)
