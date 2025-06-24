@@ -522,8 +522,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                  "\n\n")))
         ("mcpToolCall" (let ((name (plist-get content :name)))
                          (eca-chat--add-text
-                          (format (propertize "\n%s %s\n"
-                                              'line-spacing 10)
+                          (format (propertize "\n%s %s\n")
                                   (propertize "Calling MCP tool"
                                               'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-mcp-tool-call-face)
                                               'font-lock-face 'eca-chat-mcp-tool-call-face)

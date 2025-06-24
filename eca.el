@@ -275,7 +275,7 @@ If not provided, download and start eca automatically."
            :name "eca"
            :command (eca--server-command)
            :buffer eca--process-buffer-name
-           :stderr (get-buffer-create (generate-new-buffer-name eca--process-stderr-buffer-name))
+           :stderr (get-buffer-create eca--process-stderr-buffer-name)
            :filter #'eca--process-filter
            :sentinel (lambda (process exit-str)
                        (unless (process-live-p process)
@@ -314,7 +314,8 @@ If not provided, download and start eca automatically."
                                      (setf (eca--session-chat-default-behavior eca--session) chat-default-behavior)
                                      (eca-info "Started!")
                                      (eca-chat-open)
-                                     (run-hooks 'eca-after-initialize-hook)))))
+                                     (run-hooks 'eca-after-initialize-hook))
+                 :error-callback (lambda (e) (eca-error e)))))
     ('started (eca-chat-open))))
 
 ;;;###autoload
