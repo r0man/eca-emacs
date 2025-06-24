@@ -124,11 +124,22 @@ If not provided, download and start eca automatically."
           'response))
     'notification))
 
+(defun eca--download-and-store-path ()
+  "Return the path of the download and store."
+  (let* ((store-path eca-server-install-path)
+         (download-path (concat store-path ".zip")))
+    `(,download-path . ,store-path)))
+
+(defun eca--uninstall-server ()
+  "Remove downloaded server."
+  (-let (((download-path . store-path) (eca--download-and-store-path)))
+    (when (f-exists? download-path) (f-delete download-path))
+    (when (f-exists? store-path) (f-delete store-path))))
+
 (defun eca--download-server (on-downloaded)
   "Download eca server calling ON-DOWNLOADED when success."
-  (let* ((url eca-server-download-url)
-         (store-path eca-server-install-path)
-         (download-path (concat store-path ".zip")))
+  (-let ((url eca-server-download-url)
+         ((download-path . store-path) (eca--download-and-store-path)))
     (make-thread
      (lambda ()
        (condition-case err
@@ -347,6 +358,19 @@ If not provided, download and start eca automatically."
     (kill-buffer eca--process-buffer-name))
   (eca-chat-exit)
   (setq eca--session nil))
+
+;;;###autoload
+(defun eca-install-server ()
+  "Download the eca server if not downloaded."
+  (interactive)
+  (eca--download-server (lambda ())))
+
+;;;###autoload
+(defun eca-uninstall-server ()
+  "Remove downloaded eca server if present."
+  (interactive)
+  (eca--uninstall-server)
+  (eca-info "Server uninstalled!"))
 
 (provide 'eca)
 ;;; eca.el ends here
