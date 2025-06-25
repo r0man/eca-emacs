@@ -179,12 +179,22 @@ If not provided, download and start eca automatically."
                  nil (format "Invalid Content-Length value: %s" val)))
     (cons key val)))
 
+(defun eca--handle-show-message (params)
+  "Handle the show-message notification with PARAMS."
+  (let ((type (plist-get params :type))
+        (msg (plist-get params :message)))
+    (pcase type
+      ("error" (eca-error msg))
+      ("warning" (eca-warn msg))
+      ("info" (eca-info msg)))))
+
 (defun eca--handle-server-notification (notification)
   "Handle NOTIFICATION sent by server."
   (let ((method (plist-get notification :method))
         (params (plist-get notification :params)))
     (pcase method
       ("chat/contentReceived" (eca-chat-content-received params))
+      ("$/showMessage" (eca--handle-show-message params))
       (_ (eca-warn "Unknown notification %s" method)))))
 
 (defun eca--handle-server-request (_request)
