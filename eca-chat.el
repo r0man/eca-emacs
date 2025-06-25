@@ -609,7 +609,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                       (eca-chat--key-pressed-return))))
                 nil t)
       (whisper-run)
-      (message "Recording audio. Press RET when you are done.")
+      (eca-info "Recording audio. Press RET when you are done.")
       (while (not (equal ?\r (read-char)))
         (sit-for 0.5))
       (whisper-run))))
