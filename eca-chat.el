@@ -111,7 +111,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 ;; Internal
 
 (defvar-local eca-chat--history '())
-(defvar-local eca-chat--history-index 0)
+(defvar-local eca-chat--history-index -1)
 (defvar-local eca-chat--id nil)
 (defvar-local eca-chat--last-request-id 0)
 (defvar-local eca-chat--context '())
@@ -128,6 +128,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "DEL") #'eca-chat--key-pressed-backspace)
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
+    (define-key map (kbd "C-<up>") #'eca-chat--key-pressed-previous-prompt-history)
+    (define-key map (kbd "C-<down>") #'eca-chat--key-pressed-next-prompt-history)
     (define-key map (kbd "C-k") #'eca-chat-clear)
     (define-key map (kbd "<return>") #'eca-chat--key-pressed-return)
     map)
@@ -184,6 +186,30 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (insert "\n")
     (eca-chat--insert-prompt-string)
     (eca-chat--refresh-context)))
+
+(defun eca-chat--set-prompt (text)
+  "Set the chat prompt to be TEXT."
+  (-some-> (eca-chat--prompt-field-start-point) (goto-char))
+  (delete-region (point) (line-end-position))
+  (insert text))
+
+(defun eca-chat--cycle-history (n)
+  "Cycle history by N."
+  (when (and eca-chat--history (eca-chat--point-at-prompt-field-p))
+    (when (and (>= (+ eca-chat--history-index n) 0)
+               (nth (+ eca-chat--history-index n) eca-chat--history))
+      (cl-incf eca-chat--history-index n)
+      (eca-chat--set-prompt (nth eca-chat--history-index eca-chat--history)))))
+
+(defun eca-chat--key-pressed-previous-prompt-history ()
+  "Cycle previous the prompt history."
+  (interactive)
+  (eca-chat--cycle-history 1))
+
+(defun eca-chat--key-pressed-next-prompt-history ()
+  "Cycle next the prompt history."
+  (interactive)
+  (eca-chat--cycle-history -1))
 
 (defun eca-chat--key-pressed-newline ()
   "Insert a newline character at point."
@@ -262,6 +288,11 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   (and (eq (line-number-at-pos (point))
            (line-number-at-pos (eca-chat--prompt-area-start-point)))
        (eolp)))
+
+(defun eca-chat--point-at-prompt-field-p ()
+  "Return non-nil if point is at the prompt field area."
+  (eq (line-number-at-pos (point))
+      (line-number-at-pos (eca-chat--prompt-field-start-point))))
 
 (defun eca-chat--header-line-string ()
   "Update chat header line."
@@ -561,7 +592,8 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (goto-char (point-max))
       (setq-local mode-line-format `(,(propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face)))
       (rename-buffer (concat (buffer-name) ":closed") t)
-      (quit-window nil (get-buffer-window (eca-chat--get-buffer))))))
+      (when-let* ((window (get-buffer-window (eca-chat--get-buffer))))
+        (quit-window nil window)))))
 
 ;;;###autoload
 (defun eca-chat-clear ()
