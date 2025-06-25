@@ -129,6 +129,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "C-k") #'eca-chat-clear)
+    (define-key map (kbd "C-t") #'eca-chat-talk)
     (define-key map (kbd "<return>") #'eca-chat--key-pressed-return)
     map)
   "Keymap used by `eca-chat-mode'.")
@@ -582,6 +583,36 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   (interactive)
   (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
     (setq eca-chat-custom-behavior behavior)))
+
+(declare-function whisper-run "ext:whisper" ())
+
+(defun eca-chat-talk ()
+  "Talk to the assistent by recording audio and transcribing it."
+  (interactive)
+  (unless (featurep 'whisper)
+    (user-error "Whisper.el is not available, please install it first"))
+  (eca-chat-open)
+  (with-current-buffer (eca-chat--get-buffer)
+    (goto-char (point-max)))
+  (let ((buffer (get-buffer-create "*whisper-stdout*")))
+    (with-current-buffer buffer
+      (erase-buffer)
+      (make-local-variable 'whisper-after-transcription-hook)
+      (add-hook 'whisper-after-transcription-hook
+                (lambda ()
+                  (let ((transcription (buffer-substring
+                                        (line-beginning-position)
+                                        (line-end-position))))
+                    (with-current-buffer eca-chat-buffer-name
+                      (insert transcription)
+                      (newline)
+                      (eca-chat--key-pressed-return))))
+                nil t)
+      (whisper-run)
+      (message "Recording audio. Press RET when you are done.")
+      (while (not (equal ?\r (read-char)))
+        (sit-for 0.5))
+      (whisper-run))))
 
 (provide 'eca-chat)
 ;;; eca-chat.el ends here

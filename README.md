@@ -18,6 +18,7 @@ For more details about ECA, check [ECA server](https://github.com/editor-code-as
 - External `eca` server binary
   - Automatic downloaded if `eca-custom-command` is `nil`
   - Place it on your `$PATH` or customize `eca-custom-command`
+- [whisper.el](https://github.com/natrys/whisper.el/blob/master/whisper.el) for Speech-to-Text support (optional)
 
 ## Installation
 
@@ -42,6 +43,25 @@ M-x package-install eca
 2. The dedicated chat window `<eca-chat>` pops up.
 3. Type your prompt after the `> ` and press RET.
 4. Attach more context auto completing after the `@`.
+
+## Usage
+
+### Speech-to-Text support
+
+If you have [whisper.el](https://github.com/natrys/whisper.el/blob/master/whisper.el) installed you can use the `eca-chat-talk`
+command (or use the `C-t` keybinding) to talk to the Editor Code
+Assistant. This will record audio until you press `RET`. Then, the
+recorded audio will be transcribed to text and placed into the chat
+buffer.
+
+We recommend to use the `small`, it is a good trade-off between
+accuracy and transcription speed.
+
+```elisp
+(use-package whisper
+  :custom
+  (whisper-model "small"))
+```
 
 ## Contributing
 
