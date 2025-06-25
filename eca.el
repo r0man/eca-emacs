@@ -315,36 +315,33 @@ If not provided, download and start eca automatically."
 (defun eca--initialize ()
   "Sent the initialize request."
   (run-hooks 'eca-before-initialize-hook)
-  (pcase (eca--session-status eca--session)
-    ('stopped (progn
-                (setf (eca--session-status eca--session) 'starting)
-                (eca-api-request-async
-                 :method "initialize"
-                 :params (list :processId (emacs-pid)
-                               :clientInfo (list :name "emacs"
-                                                 :version (emacs-version))
-                               :capabilities (list :codeAssistant (list :chat t))
-                               :initializationOptions (list :chatBehavior eca-chat-custom-behavior)
-                               :workspaceFolders (vconcat (-map (lambda (folder)
-                                                                  (list :uri (eca--path-to-uri folder)
-                                                                        :name (file-name-nondirectory (directory-file-name folder))))
-                                                                (eca--session-workspace-folders eca--session))))
-                 :success-callback (-lambda ((&plist :chatWelcomeMessage msg
-                                                     :chatBehaviors chat-behaviors
-                                                     :chatDefaultBehavior chat-default-behavior
-                                                     :chatDefaultModel chat-default-model
-                                                     :models models))
-                                     (setf (eca--session-status eca--session) 'started)
-                                     (setf (eca--session-chat-welcome-message eca--session) msg)
-                                     (setf (eca--session-models eca--session) models)
-                                     (setf (eca--session-chat-behaviors eca--session) chat-behaviors)
-                                     (setf (eca--session-chat-default-model eca--session) chat-default-model)
-                                     (setf (eca--session-chat-default-behavior eca--session) chat-default-behavior)
-                                     (eca-info "Started!")
-                                     (eca-chat-open)
-                                     (run-hooks 'eca-after-initialize-hook))
-                 :error-callback (lambda (e) (eca-error e)))))
-    ('started (eca-chat-open))))
+  (setf (eca--session-status eca--session) 'starting)
+  (eca-api-request-async
+   :method "initialize"
+   :params (list :processId (emacs-pid)
+                 :clientInfo (list :name "emacs"
+                                   :version (emacs-version))
+                 :capabilities (list :codeAssistant (list :chat t))
+                 :initializationOptions (list :chatBehavior eca-chat-custom-behavior)
+                 :workspaceFolders (vconcat (-map (lambda (folder)
+                                                    (list :uri (eca--path-to-uri folder)
+                                                          :name (file-name-nondirectory (directory-file-name folder))))
+                                                  (eca--session-workspace-folders eca--session))))
+   :success-callback (-lambda ((&plist :chatWelcomeMessage msg
+                                       :chatBehaviors chat-behaviors
+                                       :chatDefaultBehavior chat-default-behavior
+                                       :chatDefaultModel chat-default-model
+                                       :models models))
+                       (setf (eca--session-status eca--session) 'started)
+                       (setf (eca--session-chat-welcome-message eca--session) msg)
+                       (setf (eca--session-models eca--session) models)
+                       (setf (eca--session-chat-behaviors eca--session) chat-behaviors)
+                       (setf (eca--session-chat-default-model eca--session) chat-default-model)
+                       (setf (eca--session-chat-default-behavior eca--session) chat-default-behavior)
+                       (eca-info "Started!")
+                       (eca-chat-open)
+                       (run-hooks 'eca-after-initialize-hook))
+   :error-callback (lambda (e) (eca-error e))))
 
 ;;;###autoload
 (defun eca ()
@@ -352,8 +349,11 @@ If not provided, download and start eca automatically."
   (interactive)
   (unless eca--session
     (setq eca--session (eca-create-session)))
-  (eca--start-process (lambda ()
-                        (eca--initialize))))
+  (pcase (eca--session-status eca--session)
+    ('stopped (eca--start-process (lambda ()
+                                    (eca--initialize))))
+    ('started (eca-chat-open))
+    ('starting (eca-info "eca server is already starting"))))
 
 ;;;###autoload
 (defun eca-stop ()
