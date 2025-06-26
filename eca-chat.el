@@ -589,7 +589,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat-talk ()
   "Talk to the assistent by recording audio and transcribing it."
   (interactive)
-  (unless (featurep 'whisper)
+  (unless (require 'whisper nil t)
     (user-error "Whisper.el is not available, please install it first"))
   (eca-chat-open)
   (with-current-buffer (eca-chat--get-buffer)
