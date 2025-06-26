@@ -270,7 +270,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
     (unless (string-empty-p prompt)
       (when (seq-empty-p eca-chat--history) (eca-chat--clear))
       (add-to-list 'eca-chat--history prompt)
-      (setq eca-chat--history-index 0)
+      (setq eca-chat--history-index -1)
       (goto-char prompt-start)
       (delete-region (point) (point-max))
       (eca-api-request-async
@@ -455,7 +455,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   (visual-line-mode)
   (hl-line-mode -1)
   (setq-local eca-chat--history '())
-  (setq-local eca-chat--history-index 0)
+  (setq-local eca-chat--history-index -1)
 
   (make-local-variable 'completion-at-point-functions)
   (setq-local completion-at-point-functions (list #'eca-chat-completion-at-point))
