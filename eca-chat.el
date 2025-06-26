@@ -586,6 +586,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
 (declare-function whisper-run "ext:whisper" ())
 
+;;;###autoload
 (defun eca-chat-talk ()
   "Talk to the assistent by recording audio and transcribing it."
   (interactive)
