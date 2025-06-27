@@ -382,5 +382,12 @@ If not provided, download and start eca automatically."
   (eca--uninstall-server)
   (eca-info "Server uninstalled!"))
 
+;;;###autoload
+(defun eca-workspaces ()
+  "Return workspaces used by current session."
+  (interactive)
+  (when eca--session
+    (eca-info "Workspaces: %s" (eca--session-workspace-folders eca--session))))
+
 (provide 'eca)
 ;;; eca.el ends here

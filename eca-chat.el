@@ -257,7 +257,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (insert "\n")))
 
 (defun eca-chat--key-pressed-tab ()
-  "Expand tool call if point is inside expandable content, otherwise use default tab behavior."
+  "Expand tool call if point is at expandable content, or use default behavior."
   (interactive)
   (if-let ((ov (eca-chat--expandable-content-at-point)))
       (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))
@@ -416,16 +416,15 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (insert text)
       (point))))
 
-(defun eca-chat--toggle-expandable (ov)
-  "Toggle the expandable state for overlay OV."
-  (let ((collapsed (overlay-get ov 'eca-expandable-collapsed)))
-    (if collapsed
-        (progn
-          (overlay-put ov 'eca-expandable-collapsed nil)
-          (overlay-put ov 'display (overlay-get ov 'eca-expandable-content)))
-      (overlay-put ov 'eca-expandable-collapsed t)
-      (overlay-put ov 'display (overlay-get ov 'eca-expandable-label)))))
+(defun eca-chat--expandable-content-at-point ()
+  "Return expandable content overlay at point, or nil if none."
+  (-first (-lambda (ov) (overlay-get ov 'eca-chat--expandable-content-id))
+          (overlays-in (line-beginning-position) (point))))
 
+(defun eca-chat--get-expandable-content (id)
+  "Return the overlay if there is a expandable content for ID."
+  (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
+          (overlays-in (point-min) (point-max))))
 
 (defun eca-chat--add-expandable-content (id label content)
   "Add LABEL to the chat current position for ID as a interactive text.
@@ -435,29 +434,68 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
     (let* ((context-start (eca-chat--prompt-area-start-point))
            (start-point (1- context-start)))
       (goto-char start-point)
-      (let ((ov-point (point)))
+      (let ((ov-label (make-overlay (point) (point) (current-buffer))))
+        (overlay-put ov-label 'eca-chat--expandable-content-id id)
+        (overlay-put ov-label 'eca-chat--expandable-content-toggle nil)
         (insert (propertize label
                             'line-prefix eca-chat-expandable-block-open-symbol
-                            'help-echo "mouse-1 or RET: expand/collapse"))
-        (let ((ov (make-overlay ov-point (1+ ov-point) (current-buffer))))
-          (overlay-put ov 'eca-chat--expandable-content-content (propertize content 'line-prefix "   "))
-          (overlay-put ov 'eca-chat--expandable-content-id id)
-          (overlay-put ov 'eca-chat--expandable-content-toggled nil)
-          (overlay-put ov 'eca-chat--expandable-content-end-pos (point))))
-      (insert "\n\n")
-      (point))))
+                            'help-echo "mouse-1 / tab / RET: expand/collapse"))
+        (insert "\n")
+        (let* ((start-point (point))
+               (_ (insert "\n"))
+               (ov-content (make-overlay start-point start-point (current-buffer) nil t)))
+          (overlay-put ov-content 'eca-chat--expandable-content-content (propertize content 'line-prefix "   "))
+          (overlay-put ov-label 'eca-chat--expandable-content-ov-content ov-content))))))
 
-(defun eca-chat--expandable-content-rename (id label content)
+(defun eca-chat--rename-expandable-content (id label content &optional append-content?)
   "Rename to LABEL and CONTENT the expandable content of id ID."
-  (when-let* ((ov (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
-                          (overlays-in (point-min) (point-max)))))
-    (overlay-put ov 'eca-chat--expandable-content-content (propertize content 'line-prefix "   "))
-    (save-excursion
-      (goto-char (overlay-start ov))
-      (delete-region (point) (line-end-position))
-      (insert (propertize label
-                          'line-prefix eca-chat-expandable-block-open-symbol
-                          'help-echo "mouse-1 or RET: expand/collapse")))))
+  (when-let* ((ov-label (eca-chat--get-expandable-content id)))
+    (let* ((ov-content (overlay-get ov-label 'eca-chat--expandable-content-ov-content))
+           (new-content (if append-content?
+                            (concat (overlay-get ov-content 'eca-chat--expandable-content-content) content)
+                          content))
+           (new-content (propertize new-content 'line-prefix "   "))
+           (open? (overlay-get ov-label 'eca-chat--expandable-content-toggle)))
+      (overlay-put ov-content 'eca-chat--expandable-content-content new-content)
+      (save-excursion
+        (goto-char (overlay-start ov-label))
+        (delete-region (point) (1- (overlay-start ov-content)))
+        (insert (propertize label
+                            'line-prefix (if open?
+                                             eca-chat-expandable-block-close-symbol
+                                           eca-chat-expandable-block-open-symbol)
+                            'help-echo "mouse-1 / RET / tab: expand/collapse"))
+        (when open?
+          (delete-region (overlay-start ov-content) (overlay-end ov-content))
+          (goto-char (overlay-start ov-content))
+          (insert new-content))))))
+
+(defun eca-chat--expandable-content-toggle (id &optional force? open?)
+  "Toggle the expandable-content of ID.
+If FORCE? decide to OPEN? or not."
+  (when-let* ((ov-label (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
+                                (overlays-in (point-min) (point-max)))))
+    (let* ((ov-content (overlay-get ov-label 'eca-chat--expandable-content-ov-content))
+           (open? (if force?
+                      open?
+                    (overlay-get ov-label 'eca-chat--expandable-content-toggle)))
+           (content (overlay-get ov-content 'eca-chat--expandable-content-content)))
+      (save-excursion
+        (goto-char (overlay-start ov-label))
+        (if open?
+            (progn
+              (put-text-property (point) (line-end-position)
+                                 'line-prefix eca-chat-expandable-block-open-symbol)
+              (goto-char (1+ (line-end-position)))
+              (delete-region (overlay-start ov-content) (overlay-end ov-content))
+              (overlay-put ov-label 'eca-chat--expandable-content-toggle nil))
+          (progn
+            (put-text-property (point) (line-end-position)
+                               'line-prefix eca-chat-expandable-block-close-symbol)
+            (goto-char (overlay-start ov-content))
+            (insert content)
+            (overlay-put ov-label 'eca-chat--expandable-content-toggle t))))
+      open?)))
 
 (defun eca-chat--content-table (key-vals)
   "Return a string in table format for KEY-VALS."
@@ -477,37 +515,6 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
                v)))
    ""
    key-vals))
-
-(defun eca-chat--expandable-content-at-point ()
-  "Return expandable content overlay at point, or nil if none."
-  (-first (-lambda (ov) (overlay-get ov 'eca-chat--expandable-content-id))
-          (overlays-in (line-beginning-position) (point))))
-
-(defun eca-chat--expandable-content-toggle (id)
-  "Toggle the expandable-content of ID."
-  (when-let* ((ov (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
-                          (overlays-in (point-min) (point-max)))))
-    (let ((open? (overlay-get ov 'eca-chat--expandable-content-toggle))
-          (content (overlay-get ov 'eca-chat--expandable-content-content)))
-      (if open?
-          (progn
-            (save-excursion
-              (goto-char (overlay-start ov))
-              (put-text-property (point) (line-end-position)
-                                 'line-prefix eca-chat-expandable-block-open-symbol)
-              (goto-char (1+ (line-end-position)))
-              (delete-region (point) (1+ (overlay-get ov 'eca-chat--expandable-content-end-pos))))
-            (overlay-put ov 'eca-chat--expandable-content-toggle nil))
-        (progn
-          (save-excursion
-            (goto-char (overlay-start ov))
-            (put-text-property (point) (line-end-position)
-                               'line-prefix eca-chat-expandable-block-close-symbol)
-            (goto-char (line-end-position))
-            (insert "\n" content)
-            (overlay-put ov 'eca-chat--expandable-content-end-pos (point)))
-          (overlay-put ov 'eca-chat--expandable-content-toggle t)))
-      open?)))
 
 (defun eca-chat--relativize-filename-for-workspace-root (filename roots)
   "Relativize the FILENAME if a workspace root is found for ROOTS."
@@ -695,24 +702,34 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
                   nil
                   (plist-get content :url))
                  "\n\n")))
-        ("mcpToolCall" (let* ((name (plist-get content :name))
-                              (args (plist-get content :arguments))
-                              (id (plist-get content :id)))
-                         (eca-chat--add-expandable-content
-                          id
-                          (concat (propertize "Calling MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                  (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                  " "
-                                  eca-chat-mcp-tool-call-loading-symbol)
-                          (eca-chat--content-table `(("arguments" . ,args))))))
+        ("mcpToolCallPrepare" (let* ((name (plist-get content :name))
+                                     (argsText (plist-get content :argumentsText))
+                                     (id (plist-get content :id))
+                                     (label (concat (propertize "Preparing MCP tool call: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                                    (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                                    " "
+                                                    eca-chat-mcp-tool-call-loading-symbol)))
+                                (if (eca-chat--get-expandable-content id)
+                                    (eca-chat--rename-expandable-content id label argsText t)
+                                  (eca-chat--add-expandable-content id label (eca-chat--content-table `(("arguments" . ,argsText)))))))
+        ("mcpToolCallRun" (let* ((name (plist-get content :name))
+                                 (args (plist-get content :arguments))
+                                 (id (plist-get content :id)))
+                            (eca-chat--rename-expandable-content
+                             id
+                             (concat (propertize "Calling MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                     (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                     " "
+                                     eca-chat-mcp-tool-call-loading-symbol)
+                             (eca-chat--content-table `(("arguments" . ,args))))))
         ("mcpToolCalled" (let* ((id (plist-get content :id))
                                 (name (plist-get content :name))
                                 (args (plist-get content :arguments))
-                                (outputs (plist-get content :output)))
+                                (outputs (plist-get content :outputs)))
                            (seq-doseq (output outputs)
                              (-let (((&plist :content content :error error :type type) output))
                                (pcase type
-                                 ("text" (eca-chat--expandable-content-rename
+                                 ("text" (eca-chat--rename-expandable-content
                                           id
                                           (concat (propertize "Called MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
                                                   (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
