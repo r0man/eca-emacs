@@ -170,6 +170,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "C-k") #'eca-chat-clear)
     (define-key map (kbd "C-t") #'eca-chat-talk)
     (define-key map (kbd "<return>") #'eca-chat--key-pressed-return)
+    (define-key map (kbd "<tab>") #'eca-chat--key-pressed-tab)
     map)
   "Keymap used by `eca-chat-mode'.")
 
@@ -255,6 +256,13 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   (when (eq (line-beginning-position) (eca-chat--prompt-field-start-point))
     (insert "\n")))
 
+(defun eca-chat--key-pressed-tab ()
+  "Expand tool call if point is inside expandable content, otherwise use default tab behavior."
+  (interactive)
+  (if-let ((ov (eca-chat--expandable-content-at-point)))
+      (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))
+    (call-interactively 'markdown-cycle)))
+
 (defun eca-chat--prompt-field-start-point ()
   "Return the metadata overlay for the prompt field start point."
   (overlay-start
@@ -323,8 +331,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                            (setq-local eca-chat--id (plist-get res :chatId)))))
 
     ;; check is inside a expandable text
-    (when-let* ((ov (-first (-lambda (ov) (overlay-get ov 'eca-chat--expandable-content-id))
-                            (overlays-in (line-beginning-position) (point)))))
+    (when-let* ((ov (eca-chat--expandable-content-at-point)))
       (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id)))))
 
 (defun eca-chat--point-at-new-context-p ()
@@ -470,6 +477,11 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
                v)))
    ""
    key-vals))
+
+(defun eca-chat--expandable-content-at-point ()
+  "Return expandable content overlay at point, or nil if none."
+  (-first (-lambda (ov) (overlay-get ov 'eca-chat--expandable-content-id))
+          (overlays-in (line-beginning-position) (point))))
 
 (defun eca-chat--expandable-content-toggle (id)
   "Toggle the expandable-content of ID."
