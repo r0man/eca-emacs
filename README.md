@@ -5,7 +5,7 @@
 [![MELPA](https://melpa.org/packages/eca-emacs-badge.svg)](https://melpa.org/#/eca-emacs)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-![demo](./demo.png)
+![demo](./demo.gif)
 
 ECA (Editor Code Assistant) Emacs is an AI-powered pair-programming client for Emacs.
 Inspired by lsp-mode’s JSONRPC handling, it connects to an external `eca` server process to provide interactive chat, code suggestions, context management and more.
