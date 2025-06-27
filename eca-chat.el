@@ -47,6 +47,31 @@
   :type 'string
   :group 'eca)
 
+(defcustom eca-chat-expandable-block-open-symbol "⏵ "
+  "The string used in eca chat buffer for blocks in open mode like tool calls."
+  :type 'string
+  :group 'eca)
+
+(defcustom eca-chat-expandable-block-close-symbol "⏷ "
+  "The string used in eca chat buffer for blocks in close mode like tool calls."
+  :type 'string
+  :group 'eca)
+
+(defcustom eca-chat-mcp-tool-call-loading-symbol "⏳"
+  "The string used in eca chat buffer for mcp tool calls while loading."
+  :type 'string
+  :group 'eca)
+
+(defcustom eca-chat-mcp-tool-call-error-symbol "❌"
+  "The string used in eca chat buffer for mcp tool calls when error."
+  :type 'string
+  :group 'eca)
+
+(defcustom eca-chat-mcp-tool-call-success-symbol "✅"
+  "The string used in eca chat buffer for mcp tool calls when success."
+  :type 'string
+  :group 'eca)
+
 (defcustom eca-chat-custom-model nil
   "Which model to use during chat, nil means use server's default.
 Must be a valid model supported by server, check `eca-chat-select-model`."
@@ -57,6 +82,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Which chat behavior to use, if nil use server's default."
   :type 'string
   :group 'eca)
+
+;; Faces
 
 (defface eca-chat-prompt-prefix-face
   '((t (:foreground "lime green" :weight bold)))
@@ -83,14 +110,24 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for the system messages in chat."
   :group 'eca)
 
-(defface eca-chat-mcp-tool-call-face
-  '((t :inherit font-lock-keyword-face))
+(defface eca-chat-mcp-tool-call-label-face
+  '((t :inherit font-lock-keyword-face :underline t))
   "Face for the MCP tool calls in chat."
   :group 'eca)
 
-(defface eca-chat-mcp-tool-call-name-face
-  '((t :inherit eca-chat-mcp-tool-call-face :weight bold))
-  "Face for the MCP tool calls's name in chat."
+(defface eca-chat-mcp-tool-call-content-face
+  '()
+  "Face for the MCP tool calls in chat."
+  :group 'eca)
+
+(defface eca-chat--tool-call-argument-key-face
+  '()
+  "Face for the MCP tool calls's argument key in chat."
+  :group 'eca)
+
+(defface eca-chat--tool-call-argument-value-face
+  '((t :weight bold))
+  "Face for the MCP tool calls's argument value in chat."
   :group 'eca)
 
 (defface eca-chat-welcome-face
@@ -239,13 +276,13 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   (let* ((cur-ov (car (overlays-in (line-beginning-position) (point))))
          (text (thing-at-point 'symbol))
          (context-item (-some->> text
-                                 (get-text-property 0 'eca-chat-context-item))))
+                         (get-text-property 0 'eca-chat-context-item))))
     (cond
      ((and cur-ov
            context-item)
-        (setq-local eca-chat--context (delete context-item eca-chat--context))
-        (eca-chat--refresh-context)
-        (end-of-line))
+      (setq-local eca-chat--context (delete context-item eca-chat--context))
+      (eca-chat--refresh-context)
+      (end-of-line))
 
      ((and cur-ov
            (<= (point) (overlay-start cur-ov)))
@@ -267,6 +304,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
          (prompt (save-excursion
                    (goto-char prompt-start)
                    (string-trim (buffer-substring-no-properties (point) (point-max))))))
+    ;; check prompt
     (unless (string-empty-p prompt)
       (when (seq-empty-p eca-chat--history) (eca-chat--clear))
       (add-to-list 'eca-chat--history prompt)
@@ -282,7 +320,12 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                      :behavior (eca-chat--behavior)
                      :contexts (eca-chat--contexts->request))
        :success-callback (-lambda (res)
-                           (setq-local eca-chat--id (plist-get res :chatId)))))))
+                           (setq-local eca-chat--id (plist-get res :chatId)))))
+
+    ;; check is inside a expandable text
+    (when-let* ((ov (-first (-lambda (ov) (overlay-get ov 'eca-chat--expandable-content-id))
+                            (overlays-in (line-beginning-position) (point)))))
+      (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id)))))
 
 (defun eca-chat--point-at-new-context-p ()
   "Return non-nil if point is at the context area."
@@ -357,7 +400,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (goto-char eca-chat--last-user-message-pos)
       (insert content))))
 
-(defun eca-chat--add-text (text)
+(defun eca-chat--add-text-content (text)
   "Add TEXT to the chat current position."
   (let ((context-start (eca-chat--prompt-area-start-point)))
     (save-excursion
@@ -365,6 +408,94 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (goto-char (1- (point)))
       (insert text)
       (point))))
+
+(defun eca-chat--toggle-expandable (ov)
+  "Toggle the expandable state for overlay OV."
+  (let ((collapsed (overlay-get ov 'eca-expandable-collapsed)))
+    (if collapsed
+        (progn
+          (overlay-put ov 'eca-expandable-collapsed nil)
+          (overlay-put ov 'display (overlay-get ov 'eca-expandable-content)))
+      (overlay-put ov 'eca-expandable-collapsed t)
+      (overlay-put ov 'display (overlay-get ov 'eca-expandable-label)))))
+
+
+(defun eca-chat--add-expandable-content (id label content)
+  "Add LABEL to the chat current position for ID as a interactive text.
+When expanded, shows CONTENT.
+Applies LABEL-FACE to label and CONTENT-FACE to content."
+  (save-excursion
+    (let* ((context-start (eca-chat--prompt-area-start-point))
+           (start-point (1- context-start)))
+      (goto-char start-point)
+      (let ((ov-point (point)))
+        (insert (propertize label
+                            'line-prefix eca-chat-expandable-block-open-symbol
+                            'help-echo "mouse-1 or RET: expand/collapse"))
+        (let ((ov (make-overlay ov-point (1+ ov-point) (current-buffer))))
+          (overlay-put ov 'eca-chat--expandable-content-content (propertize content 'line-prefix "   "))
+          (overlay-put ov 'eca-chat--expandable-content-id id)
+          (overlay-put ov 'eca-chat--expandable-content-toggled nil)
+          (overlay-put ov 'eca-chat--expandable-content-end-pos (point))))
+      (insert "\n\n")
+      (point))))
+
+(defun eca-chat--expandable-content-rename (id label content)
+  "Rename to LABEL and CONTENT the expandable content of id ID."
+  (when-let* ((ov (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
+                          (overlays-in (point-min) (point-max)))))
+    (overlay-put ov 'eca-chat--expandable-content-content (propertize content 'line-prefix "   "))
+    (save-excursion
+      (goto-char (overlay-start ov))
+      (delete-region (point) (line-end-position))
+      (insert (propertize label
+                          'line-prefix eca-chat-expandable-block-open-symbol
+                          'help-echo "mouse-1 or RET: expand/collapse")))))
+
+(defun eca-chat--content-table (key-vals)
+  "Return a string in table format for KEY-VALS."
+  (-reduce-from
+   (-lambda (a (k . v))
+     (concat a "\n" k ": \n"
+             (if (listp v)
+                 (string-join (-map-indexed
+                               (lambda (i item)
+                                 (if (cl-evenp i)
+                                     (propertize (concat (substring (symbol-name item) 1) ": ")
+                                                 'font-lock-face 'eca-chat--tool-call-argument-key-face)
+                                   (propertize (concat (prin1-to-string item) "\n")
+                                               'font-lock-face 'eca-chat--tool-call-argument-value-face)))
+                               v)
+                              "")
+               v)))
+   ""
+   key-vals))
+
+(defun eca-chat--expandable-content-toggle (id)
+  "Toggle the expandable-content of ID."
+  (when-let* ((ov (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
+                          (overlays-in (point-min) (point-max)))))
+    (let ((open? (overlay-get ov 'eca-chat--expandable-content-toggle))
+          (content (overlay-get ov 'eca-chat--expandable-content-content)))
+      (if open?
+          (progn
+            (save-excursion
+              (goto-char (overlay-start ov))
+              (put-text-property (point) (line-end-position)
+                                 'line-prefix eca-chat-expandable-block-open-symbol)
+              (goto-char (1+ (line-end-position)))
+              (delete-region (point) (1+ (overlay-get ov 'eca-chat--expandable-content-end-pos))))
+            (overlay-put ov 'eca-chat--expandable-content-toggle nil))
+        (progn
+          (save-excursion
+            (goto-char (overlay-start ov))
+            (put-text-property (point) (line-end-position)
+                               'line-prefix eca-chat-expandable-block-close-symbol)
+            (goto-char (line-end-position))
+            (insert "\n" content)
+            (overlay-put ov 'eca-chat--expandable-content-end-pos (point)))
+          (overlay-put ov 'eca-chat--expandable-content-toggle t)))
+      open?)))
 
 (defun eca-chat--relativize-filename-for-workspace-root (filename roots)
   "Relativize the FILENAME if a workspace root is found for ROOTS."
@@ -530,7 +661,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
         ("text" (when-let* ((text (plist-get content :text)))
                   (pcase role
                     ("user" (progn
-                              (eca-chat--add-text
+                              (eca-chat--add-text-content
                                (propertize text
                                            'font-lock-face 'eca-chat-user-messages-face
                                            'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-user-messages-face)
@@ -538,11 +669,11 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                               (eca-chat--mark-header)
                               (font-lock-ensure)))
                     ("system" (progn
-                                (eca-chat--add-text
+                                (eca-chat--add-text-content
                                  (propertize text
                                              'line-height 20
                                              'font-lock-face 'eca-chat-system-messages-face))))
-                    (_ (eca-chat--add-text text)))))
+                    (_ (eca-chat--add-text-content text)))))
         ("url" (eca-chat--add-header
                 (concat
                  "🌐 "
@@ -552,14 +683,33 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                   nil
                   (plist-get content :url))
                  "\n\n")))
-        ("mcpToolCall" (let ((name (plist-get content :name)))
-                         (eca-chat--add-text
-                          (format (propertize "\n%s %s\n")
-                                  (propertize "Calling MCP tool"
-                                              'line-prefix (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-mcp-tool-call-face)
-                                              'font-lock-face 'eca-chat-mcp-tool-call-face)
-                                  (propertize name
-                                              'font-lock-face 'eca-chat-mcp-tool-call-name-face)))))
+        ("mcpToolCall" (let* ((name (plist-get content :name))
+                              (args (plist-get content :arguments))
+                              (id (plist-get content :id)))
+                         (eca-chat--add-expandable-content
+                          id
+                          (concat (propertize "Calling MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                  (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                  " "
+                                  eca-chat-mcp-tool-call-loading-symbol)
+                          (eca-chat--content-table `(("arguments" . ,args))))))
+        ("mcpToolCalled" (let* ((id (plist-get content :id))
+                                (name (plist-get content :name))
+                                (args (plist-get content :arguments))
+                                (outputs (plist-get content :output)))
+                           (seq-doseq (output outputs)
+                             (-let (((&plist :content content :error error :type type) output))
+                               (pcase type
+                                 ("text" (eca-chat--expandable-content-rename
+                                          id
+                                          (concat (propertize "Called MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                                  (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                                  " "
+                                                  (if error
+                                                      eca-chat-mcp-tool-call-error-symbol
+                                                    eca-chat-mcp-tool-call-success-symbol))
+                                          (eca-chat--content-table `(("Arguments" . ,args)
+                                                                     ("Output" . ,content))))))))))
         ("progress" (pcase (plist-get content :state)
                       ("running" (progn
                                    (unless eca-chat--spinner-timer
@@ -567,7 +717,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                                    (setq-local eca-chat--progress-text (propertize (plist-get content :text) 'font-lock-face 'eca-chat-system-messages-face))))
                       ("finished" (progn
                                     (eca-chat--spinner-stop)
-                                    (eca-chat--add-text (propertize "\n" 'line-spacing 10))
+                                    (eca-chat--add-text-content (propertize "\n" 'line-spacing 10))
                                     (setq-local eca-chat--progress-text "")))))))))
 
 (defun eca-chat-open ()
