@@ -15,8 +15,10 @@ For more details about ECA, check [ECA server](https://github.com/editor-code-as
 ## Requirements
 
 - Emacs 28.1 or later
-- External `eca` server binary
-  - Automatic downloaded if `eca-custom-command` is `nil`
+
+### Optional 
+
+- Custom `eca` server binary, it's automatically downloaded if `eca-custom-command` is `nil`
   - Place it on your `$PATH` or customize `eca-custom-command`
 - [whisper.el](https://github.com/natrys/whisper.el/blob/master/whisper.el) for Speech-to-Text support (optional)
 
