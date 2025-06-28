@@ -796,6 +796,13 @@ If FORCE? decide to OPEN? or not."
   (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
     (setq eca-chat-custom-behavior behavior)))
 
+;;;###autoload
+(defun eca-chat-restart ()
+  "Restart a new eca chat."
+  (interactive)
+  (eca-chat-exit)
+  (eca-chat-open))
+
 (declare-function whisper-run "ext:whisper" ())
 
 ;;;###autoload
