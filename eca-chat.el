@@ -602,7 +602,6 @@ If FORCE? decide to OPEN? or not."
   "Major mode for ECA chat sessions.
 \\{eca-chat-mode-map}"
   :group 'eca
-  (setq major-mode 'eca-chat-mode)
   (visual-line-mode)
   (hl-line-mode -1)
   (setq-local eca-chat--history '())
