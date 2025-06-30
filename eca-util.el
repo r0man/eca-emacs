@@ -15,6 +15,20 @@
 (require 'vc-git)
 (require 'dash)
 
+(defun eca-assoc (map key val)
+  "Return a new MAP with KEY associated to flat plist VAL, replacing any existing."
+  (cons (cons key val)
+        (cl-remove-if (lambda (pair) (equal (car pair) key)) map)))
+
+(defun eca-get (map key)
+  "Return the plist value associated with KEY in MAP, or nil."
+  (let ((pair (cl-find key map :key #'car :test #'equal)))
+    (when pair (cdr pair))))
+
+(defun eca-vals (map)
+  "Return the plist values from MAP."
+  (-map #'cdr map))
+
 (defun eca--project-root ()
   "Get the project root using git falling back to file directory."
   (-some-> (or (vc-git-root default-directory)
@@ -48,6 +62,9 @@
   ;; The suported models by the server.
   (models '())
 
+  ;; The mcp servers and their status.
+  (mcp-servers '())
+
   ;; Default model to use in the chat returned by server.
   (chat-default-model nil)
 
@@ -65,6 +82,18 @@
   (let ((session (make-eca--session)))
     (setf (eca--session-workspace-folders session) (list (eca--project-root)))
     session))
+
+(defun eca-assert-session-running ()
+  "Assert that a eca session is running."
+  (unless eca--session
+    (user-error "ECA must be running, start with `eca` command")))
+
+(defun eca--path-to-uri (path)
+  "Convert a PATH to a uri."
+  (concat "file://"
+          (--> path
+               (expand-file-name it)
+               (or (file-remote-p it 'localname t) it))))
 
 (defun eca-info (format &rest args)
   "Display eca info message with FORMAT with ARGS."

@@ -17,6 +17,7 @@
 
 (require 'eca-util)
 (require 'eca-api)
+(require 'eca-mcp)
 
 ;; Variables
 
@@ -205,6 +206,27 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   (or eca-chat-custom-model
       (eca--session-chat-default-model eca--session)))
 
+(defun eca-chat--mcps-summary ()
+  "The summary of MCP servers."
+  (let* ((running 0) (starting 0) (failed 0)
+         (propertize-fn (lambda (n face &optional add-slash?)
+                          (unless (zerop n)
+                            (concat
+                             (propertize (number-to-string n) 'font-lock-face face)
+                             (when add-slash? (propertize "/" 'font-lock-face 'font-lock-comment-face))))))
+         (mcp-servers (eca-vals (eca--session-mcp-servers eca--session))))
+    (if (seq-empty-p mcp-servers)
+        "0"
+      (progn
+        (seq-doseq (mcp-server mcp-servers)
+          (pcase (plist-get mcp-server :status)
+            ("running" (cl-incf running))
+            ("starting" (cl-incf starting))
+            ("failed" (cl-incf failed))))
+        (concat (funcall propertize-fn failed 'error (or (> running 0) (> starting 0)))
+                (funcall propertize-fn starting 'warning (> running 0))
+                (funcall propertize-fn running 'success))))))
+
 (defun eca-chat--insert-prompt-string ()
   "Insert the prompt and context string adding overlay metadatas."
   (let ((prompt-area-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)) (current-buffer))))
@@ -348,9 +370,11 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat--header-line-string ()
   "Update chat header line."
   (let ((model-keymap (make-sparse-keymap))
-        (behavior-keymap (make-sparse-keymap)))
+        (behavior-keymap (make-sparse-keymap))
+        (mcp-keymap (make-sparse-keymap)))
     (define-key model-keymap (kbd "<header-line> <mouse-1>") #'eca-chat-select-model)
     (define-key behavior-keymap (kbd "<header-line> <mouse-1>") #'eca-chat-select-behavior)
+    (define-key mcp-keymap (kbd "<header-line> <mouse-1>") #'eca-mcp-details)
     (list (propertize "model:"
                       'font-lock-face 'eca-chat-option-key-face
                       'pointer 'hand
@@ -367,7 +391,15 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
           (propertize (eca-chat--behavior)
                       'font-lock-face 'eca-chat-option-value-face
                       'pointer 'hand
-                      'keymap behavior-keymap))))
+                      'keymap behavior-keymap)
+          "  "
+          (propertize "mcps:"
+                      'font-lock-face 'eca-chat-option-key-face
+                      'pointer 'hand
+                      'keymap mcp-keymap)
+          (propertize (eca-chat--mcps-summary)
+                      'pointer 'hand
+                      'keymap mcp-keymap))))
 
 (defun eca-chat--mode-line-string ()
   "Update chat mode line."
@@ -749,8 +781,13 @@ If FORCE? decide to OPEN? or not."
                                     (eca-chat--add-text-content (propertize "\n" 'line-spacing 10))
                                     (setq-local eca-chat--progress-text "")))))))))
 
+(defun eca-chat--handle-mcp-server-updated (_server)
+  "Handle mcp SERVER updated."
+  (force-mode-line-update))
+
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
+  (eca-assert-session-running)
   (let ((source-buffer (current-buffer)))
     (unless (buffer-live-p (eca-chat--get-buffer))
       (eca-chat--create-buffer))
@@ -785,6 +822,7 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-select-model ()
   "Select which model to use in the chat from what server supports."
   (interactive)
+  (eca-assert-session-running)
   (when-let* ((model (completing-read "Select a model:" (append (eca--session-models eca--session) nil) nil t)))
     (setq eca-chat-custom-model model)))
 
@@ -792,6 +830,7 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-select-behavior ()
   "Select which chat behavior to use from what server supports."
   (interactive)
+  (eca-assert-session-running)
   (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
     (setq eca-chat-custom-behavior behavior)))
 
@@ -810,6 +849,7 @@ If FORCE? decide to OPEN? or not."
   (interactive)
   (unless (require 'whisper nil t)
     (user-error "Whisper.el is not available, please install it first"))
+  (eca-assert-session-running)
   (eca-chat-open)
   (with-current-buffer (eca-chat--get-buffer)
     (goto-char (point-max)))
