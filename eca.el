@@ -25,6 +25,7 @@
 (require 'eca-process)
 (require 'eca-api)
 (require 'eca-chat)
+(require 'eca-mcp)
 
 (defgroup eca nil
   "ECA group."
@@ -69,7 +70,8 @@
         (eca-assoc (eca--session-mcp-servers eca--session)
                    (plist-get server :name)
                    server))
-  (eca-chat--handle-mcp-server-updated server))
+  (eca-chat--handle-mcp-server-updated server)
+  (eca-mcp--handle-mcp-server-updated server))
 
 (defun eca--handle-server-notification (notification)
   "Handle NOTIFICATION sent by server."
@@ -156,20 +158,8 @@
     (eca-api-notify :method "exit")
     (eca-process-stop))
   (eca-chat-exit)
+  (eca-mcp-details-exit)
   (setq eca--session nil))
-
-;;;###autoload
-(defun eca-install-server ()
-  "Download the eca server if not downloaded."
-  (interactive)
-  (eca--download-server (lambda ())))
-
-;;;###autoload
-(defun eca-uninstall-server ()
-  "Remove downloaded eca server if present."
-  (interactive)
-  (eca--uninstall-server)
-  (eca-info "Server uninstalled!"))
 
 ;;;###autoload
 (defun eca-workspaces ()

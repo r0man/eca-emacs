@@ -249,5 +249,18 @@ Call HANDLE-MSG for new msgs processed."
         (select-window (get-buffer-window (buffer-name)))
       (display-buffer (current-buffer)))))
 
+;;;###autoload
+(defun eca-install-server ()
+  "Download the eca server if not downloaded."
+  (interactive)
+  (eca-process--download-server (lambda ())))
+
+;;;###autoload
+(defun eca-uninstall-server ()
+  "Remove downloaded eca server if present."
+  (interactive)
+  (eca-process--uninstall-server)
+  (eca-info "Server uninstalled!"))
+
 (provide 'eca-process)
 ;;; eca-process.el ends here
