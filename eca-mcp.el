@@ -42,43 +42,44 @@
 
 (defun eca-mcp--refresh-server-details ()
   "Refresh the MCP server details."
-  (with-current-buffer (eca-mcp--get-details-buffer)
-    (erase-buffer)
-    (insert (propertize "MCP servers" 'font-lock-face 'helpful-heading))
-    (insert "\n\n")
-    (seq-doseq (server (-sort  (lambda (a b)
-                                 (string-lessp (plist-get a :name)
-                                               (plist-get b :name)))
-                               (eca-vals (eca--session-mcp-servers eca--session))))
-      (-let (((&plist :name name :command command :args args
-                      :status status :tools tools) server))
-        (insert (propertize name 'font-lock-face 'bold))
-        (insert " - ")
-        (insert (propertize status
-                            'font-lock-face (pcase status
-                                              ("running" 'success)
-                                              ("starting" 'warning)
-                                              ("failed" 'error)
-                                              ("stopped" 'default)
-                                              ("disabled" 'shadow))))
-        (insert "\n")
-        (if (seq-empty-p tools)
-            (insert (propertize "No tools available" 'font-lock-face font-lock-doc-face))
-          (progn
-            (insert (propertize "Tools: " 'font-lock-face font-lock-doc-face))
-            (seq-doseq (tool tools)
-              (insert (propertize (plist-get tool :name) 'font-lock-face 'eca-mcp-details-tool-face) " "))))
-        (insert "\n")
-        (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
-        (insert (concat command " " (string-join args " ")))
-        (when (string= "failed" status)
+  (when (buffer-live-p (get-buffer eca-mcp-details-buffer-name))
+    (with-current-buffer (eca-mcp--get-details-buffer)
+      (erase-buffer)
+      (insert (propertize "MCP servers" 'font-lock-face 'helpful-heading))
+      (insert "\n\n")
+      (seq-doseq (server (-sort  (lambda (a b)
+                                   (string-lessp (plist-get a :name)
+                                                 (plist-get b :name)))
+                                 (eca-vals (eca--session-mcp-servers eca--session))))
+        (-let (((&plist :name name :command command :args args
+                        :status status :tools tools) server))
+          (insert (propertize name 'font-lock-face 'bold))
+          (insert " - ")
+          (insert (propertize status
+                              'font-lock-face (pcase status
+                                                ("running" 'success)
+                                                ("starting" 'warning)
+                                                ("failed" 'error)
+                                                ("stopped" 'default)
+                                                ("disabled" 'shadow))))
           (insert "\n")
-          (insert (propertize (format "Failed to start, check %s for details"
-                                      (buttonize
-                                       "eca stderr buffer"
-                                       (lambda(_) (eca-process-show-stderr))))
-                              'font-lock-face 'error))))
-      (insert "\n\n"))))
+          (if (seq-empty-p tools)
+              (insert (propertize "No tools available" 'font-lock-face font-lock-doc-face))
+            (progn
+              (insert (propertize "Tools: " 'font-lock-face font-lock-doc-face))
+              (seq-doseq (tool tools)
+                (insert (propertize (plist-get tool :name) 'font-lock-face 'eca-mcp-details-tool-face) " "))))
+          (insert "\n")
+          (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
+          (insert (concat command " " (string-join args " ")))
+          (when (string= "failed" status)
+            (insert "\n")
+            (insert (propertize (format "Failed to start, check %s for details"
+                                        (buttonize
+                                         "eca stderr buffer"
+                                         (lambda(_) (eca-process-show-stderr))))
+                                'font-lock-face 'error))))
+        (insert "\n\n")))))
 
 ;; Public
 
