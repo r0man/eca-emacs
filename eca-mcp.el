@@ -71,7 +71,7 @@
                 (insert (propertize (plist-get tool :name) 'font-lock-face 'eca-mcp-details-tool-face) " "))))
           (insert "\n")
           (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
-          (insert (concat command " " (string-join args " ")))
+          (insert command " " (string-join args " "))
           (when (string= "failed" status)
             (insert "\n")
             (insert (propertize (format "Failed to start, check %s for details"

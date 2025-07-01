@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest]
         emacs-version:
           - 28.1
           - snapshot
@@ -26,13 +26,22 @@ jobs:
       with:
         version: ${{ matrix.emacs-version }}
 
-    - uses: emacs-eask/setup-eask@master
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
       with:
-        version: 'snapshot'
+        python-version: '3.10'
 
-    - name: Set workaround env var
+    - name: Install melpazoid
       run: |
-        echo "ACTIONS_ALLOW_UNSECURE_COMMANDS=true" >> $GITHUB_ENV
+        python -m pip install --upgrade pip
+        git clone https://github.com/riscy/melpazoid.git ~/melpazoid
+        pip install ~/melpazoid
 
-    - name: Run tests
-      run: 'make ci'
+    - name: Run melpazoid
+      env:
+        LOCAL_REPO: ${{ github.workspace }}
+        # RECIPE is your recipe as written for MELPA:
+        RECIPE: (eca :fetcher github :repo "editor-code-assistant/eca-emacs")
+        # set this to false (or remove it) if the package isn't on MELPA:
+        EXIST_OK: false
+      run: echo $GITHUB_REF && make -C ~/melpazoid

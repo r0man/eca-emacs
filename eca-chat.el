@@ -283,7 +283,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   (interactive)
   (if-let ((ov (eca-chat--expandable-content-at-point)))
       (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))
-    (call-interactively 'markdown-cycle)))
+    (call-interactively #'markdown-cycle)))
 
 (defun eca-chat--prompt-field-start-point ()
   "Return the metadata overlay for the prompt field start point."
