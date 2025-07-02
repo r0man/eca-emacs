@@ -734,43 +734,52 @@ If FORCE? decide to OPEN? or not."
                   nil
                   (plist-get content :url))
                  "\n\n")))
-        ("mcpToolCallPrepare" (let* ((name (plist-get content :name))
-                                     (argsText (plist-get content :argumentsText))
-                                     (id (plist-get content :id))
-                                     (label (concat (propertize "Preparing MCP tool call: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                                    (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                                    " "
-                                                    eca-chat-mcp-tool-call-loading-symbol)))
-                                (if (eca-chat--get-expandable-content id)
-                                    (eca-chat--rename-expandable-content id label argsText t)
-                                  (eca-chat--add-expandable-content id label (eca-chat--content-table `(("arguments" . ,argsText)))))))
-        ("mcpToolCallRun" (let* ((name (plist-get content :name))
-                                 (args (plist-get content :arguments))
-                                 (id (plist-get content :id)))
-                            (eca-chat--rename-expandable-content
-                             id
-                             (concat (propertize "Calling MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                     (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                     " "
-                                     eca-chat-mcp-tool-call-loading-symbol)
-                             (eca-chat--content-table `(("arguments" . ,args))))))
-        ("mcpToolCalled" (let* ((id (plist-get content :id))
-                                (name (plist-get content :name))
-                                (args (plist-get content :arguments))
-                                (outputs (plist-get content :outputs)))
-                           (seq-doseq (output outputs)
-                             (-let (((&plist :content content :error error :type type) output))
-                               (pcase type
-                                 ("text" (eca-chat--rename-expandable-content
-                                          id
-                                          (concat (propertize "Called MCP tool: " 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                                  (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                                  " "
-                                                  (if error
-                                                      eca-chat-mcp-tool-call-error-symbol
-                                                    eca-chat-mcp-tool-call-success-symbol))
-                                          (eca-chat--content-table `(("Arguments" . ,args)
-                                                                     ("Output" . ,content))))))))))
+        ("toolCallPrepare" (let* ((name (plist-get content :name))
+                                  (origin (plist-get content :origin))
+                                  (argsText (plist-get content :argumentsText))
+                                  (id (plist-get content :id))
+                                  (label (concat (propertize (format "Preparing %s tool call: "
+                                                                     (if (string= "mcp" origin) "MCP" "ECA"))
+                                                             'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                                 (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                                 " "
+                                                 eca-chat-mcp-tool-call-loading-symbol)))
+                             (if (eca-chat--get-expandable-content id)
+                                 (eca-chat--rename-expandable-content id label argsText t)
+                               (eca-chat--add-expandable-content id label (eca-chat--content-table `(("arguments" . ,argsText)))))))
+        ("toolCallRun" (let* ((name (plist-get content :name))
+                              (origin (plist-get content :origin))
+                              (args (plist-get content :arguments))
+                              (id (plist-get content :id)))
+                         (eca-chat--rename-expandable-content
+                          id
+                          (concat (propertize (format "Calling %s tool: "
+                                                      (if (string= "mcp" origin) "MCP" "ECA"))
+                                              'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                  (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                  " "
+                                  eca-chat-mcp-tool-call-loading-symbol)
+                          (eca-chat--content-table `(("arguments" . ,args))))))
+        ("toolCalled" (let* ((id (plist-get content :id))
+                             (name (plist-get content :name))
+                             (origin (plist-get content :origin))
+                             (args (plist-get content :arguments))
+                             (outputs (plist-get content :outputs)))
+                        (seq-doseq (output outputs)
+                          (-let (((&plist :content content :error error :type type) output))
+                            (pcase type
+                              ("text" (eca-chat--rename-expandable-content
+                                       id
+                                       (concat (propertize (format "Called %s tool: "
+                                                                   (if (string= "mcp" origin) "MCP" "ECA") )
+                                                           'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                               (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                               " "
+                                               (if error
+                                                   eca-chat-mcp-tool-call-error-symbol
+                                                 eca-chat-mcp-tool-call-success-symbol))
+                                       (eca-chat--content-table `(("Arguments" . ,args)
+                                                                  ("Output" . ,content))))))))))
         ("progress" (pcase (plist-get content :state)
                       ("running" (progn
                                    (unless eca-chat--spinner-timer
