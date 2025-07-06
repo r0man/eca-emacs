@@ -43,6 +43,11 @@
   :type 'string
   :group 'eca)
 
+(defcustom eca-chat-prompt-prefix-loading "⏳ "
+  "The prompt prefix string used in eca chat buffer when loading."
+  :type 'string
+  :group 'eca)
+
 (defcustom eca-chat-context-prefix "@"
   "The context prefix string used in eca chat buffer."
   :type 'string
@@ -89,6 +94,11 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defface eca-chat-prompt-prefix-face
   '((t (:foreground "lime green" :weight bold)))
   "Face for the `eca-chat-prompt-prefix`."
+  :group 'eca)
+
+(defface eca-chat-prompt-stop-face
+  '((t (:inherit error :underline t :weight bold)))
+  "Face for the stop action when loading."
   :group 'eca)
 
 (defface eca-chat-context-unlinked-face
@@ -157,6 +167,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--spinner-timer nil)
 (defvar-local eca-chat--progress-text "")
 (defvar-local eca-chat--last-user-message-pos nil)
+(defvar-local eca-chat--chat-loading nil)
 
 (defvar eca-chat-buffer-name "<eca-chat>")
 
@@ -164,7 +175,6 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<backspace>") #'eca-chat--key-pressed-backspace)
     (define-key map (kbd "DEL") #'eca-chat--key-pressed-backspace)
-    (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "C-<up>") #'eca-chat--key-pressed-previous-prompt-history)
     (define-key map (kbd "C-<down>") #'eca-chat--key-pressed-next-prompt-history)
@@ -231,8 +241,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Insert the prompt and context string adding overlay metadatas."
   (let ((prompt-area-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)) (current-buffer))))
     (overlay-put prompt-area-ov 'eca-chat-prompt-area t))
-  (let ((prompt-context-area-ov (make-overlay (line-beginning-position) (line-end-position) (current-buffer))))
-    (overlay-put prompt-context-area-ov 'eca-chat-context-area t))
+  (let ((context-area-ov (make-overlay (line-beginning-position) (line-end-position) (current-buffer))))
+    (overlay-put context-area-ov 'eca-chat-context-area t))
   (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-unlinked-face))
   (insert "\n")
   (let ((prompt-field-ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)) (current-buffer))))
@@ -247,6 +257,49 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (insert "\n")
     (eca-chat--insert-prompt-string)
     (eca-chat--refresh-context)))
+
+(defun eca-chat--buttonize (text callback)
+  "Create a actionable TEXT that call CALLBACK when actioned."
+  (let ((km (make-sparse-keymap))
+        (callback-int (lambda (&rest _)
+                        (interactive)
+                        (funcall callback))))
+    (define-key km (kbd "<mouse-1>") callback-int)
+    (define-key km (kbd "<tab>") callback-int)
+    (define-key km (kbd "<return>") callback-int)
+    (propertize text
+                'eca-chat-on-action callback
+                'pointer 'hand
+                'keymap km)))
+
+(defun eca-chat--stop-prompt ()
+  "Stop the running chat prompt."
+  (when eca-chat--chat-loading
+    (with-current-buffer (eca-chat--get-buffer)
+      (eca-api-notify :method "chat/promptStop"
+                      :params (list :chatId eca-chat--id))
+      (eca-chat--set-chat-loading nil))))
+
+(defun eca-chat--set-chat-loading (loading)
+  "Set the chat to a loading state if LOADING is non nil.
+Otherwise to a not loading state."
+  (unless (eq eca-chat--chat-loading loading)
+    (setq-local eca-chat--chat-loading loading)
+    (let ((prompt-field-ov (eca-chat--prompt-field-ov))
+          (stop-text (eca-chat--buttonize
+                      (propertize "stop" 'font-lock-face 'eca-chat-prompt-stop-face)
+                      #'eca-chat--stop-prompt)))
+      (if eca-chat--chat-loading
+          (progn
+            (overlay-put prompt-field-ov 'before-string (propertize eca-chat-prompt-prefix-loading 'font-lock-face 'default))
+            (save-excursion
+              (goto-char (overlay-start prompt-field-ov))
+              (insert stop-text)))
+        (progn
+          (overlay-put prompt-field-ov 'before-string (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-prompt-prefix-face))
+          (save-excursion
+            (goto-char (overlay-start prompt-field-ov))
+            (delete-region (point) (+ (point) (length stop-text)))))))))
 
 (defun eca-chat--set-prompt (text)
   "Set the chat prompt to be TEXT."
@@ -285,17 +338,28 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
       (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))
     (call-interactively #'markdown-cycle)))
 
+(defun eca-chat--prompt-field-ov ()
+  "Return the overlay for the prompt field."
+  (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-prompt-field)))
+          (overlays-in (point-min) (point-max))))
+
 (defun eca-chat--prompt-field-start-point ()
   "Return the metadata overlay for the prompt field start point."
-  (overlay-start
-   (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-prompt-field)))
-           (overlays-in (point-min) (point-max)))))
+  (overlay-start (eca-chat--prompt-field-ov)))
+
+(defun eca-chat--prompt-context-field-ov ()
+  "Return the overlay for the context field."
+  (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-context-area)))
+          (overlays-in (point-min) (point-max))))
+
+(defun eca-chat--prompt-area-ov ()
+  "Return the overlay for the prompt area."
+  (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-prompt-area)))
+          (overlays-in (point-min) (point-max))))
 
 (defun eca-chat--prompt-area-start-point ()
   "Return the metadata overlay for the prompt area start point."
-  (-some->
-      (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-prompt-area)))
-              (overlays-in (point-min) (point-max)))
+  (-some-> (eca-chat--prompt-area-ov)
     (overlay-start)))
 
 (defun eca-chat--key-pressed-backspace ()
@@ -330,31 +394,44 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat--key-pressed-return ()
   "Send the current prompt to eca process if in prompt."
   (interactive)
-  (let* ((prompt-start (eca-chat--prompt-field-start-point))
-         (prompt (save-excursion
-                   (goto-char prompt-start)
-                   (string-trim (buffer-substring-no-properties (point) (point-max))))))
-    ;; check prompt
-    (unless (string-empty-p prompt)
-      (when (seq-empty-p eca-chat--history) (eca-chat--clear))
-      (add-to-list 'eca-chat--history prompt)
-      (setq eca-chat--history-index -1)
-      (goto-char prompt-start)
-      (delete-region (point) (point-max))
-      (eca-api-request-async
-       :method "chat/prompt"
-       :params (list :message prompt
-                     :request-id (cl-incf eca-chat--last-request-id)
-                     :chatId eca-chat--id
-                     :model (eca-chat--model)
-                     :behavior (eca-chat--behavior)
-                     :contexts (eca-chat--contexts->request))
-       :success-callback (-lambda (res)
-                           (setq-local eca-chat--id (plist-get res :chatId)))))
+  (with-current-buffer (eca-chat--get-buffer)
+    (let* ((prompt-start (eca-chat--prompt-field-start-point))
+           (prompt (save-excursion
+                     (goto-char prompt-start)
+                     (string-trim (buffer-substring-no-properties (point) (point-max))))))
+      (cond
+       ;; check prompt
+       ((and (not (string-empty-p prompt))
+             (not eca-chat--chat-loading))
+        (when (seq-empty-p eca-chat--history) (eca-chat--clear))
+        (add-to-list 'eca-chat--history prompt)
+        (setq eca-chat--history-index -1)
+        (goto-char prompt-start)
+        (delete-region (point) (point-max))
+        (eca-chat--set-chat-loading t)
+        (eca-api-request-async
+         :method "chat/prompt"
+         :params (list :message prompt
+                       :request-id (cl-incf eca-chat--last-request-id)
+                       :chatId eca-chat--id
+                       :model (eca-chat--model)
+                       :behavior (eca-chat--behavior)
+                       :contexts (eca-chat--contexts->request))
+         :success-callback (-lambda (res)
+                             (setq-local eca-chat--id (plist-get res :chatId)))))
 
-    ;; check is inside a expandable text
-    (when-let* ((ov (eca-chat--expandable-content-at-point)))
-      (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id)))))
+       ;; check is inside a expandable text
+       ((eca-chat--expandable-content-at-point)
+        (let ((ov (eca-chat--expandable-content-at-point)))
+          (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))))
+
+       ;; check it's an actionable text
+       ((-some->> (thing-at-point 'symbol) (get-text-property 0 'eca-chat-on-action))
+        (-some->> (thing-at-point 'symbol)
+          (get-text-property 0 'eca-chat-on-action)
+          (funcall)))
+
+       (t nil)))))
 
 (defun eca-chat--point-at-new-context-p ()
   "Return non-nil if point is at the context area."
@@ -558,8 +635,7 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat--refresh-context ()
   "Refresh chat context."
   (save-excursion
-    (-some-> (-first (-lambda (ov) (eq t (overlay-get ov 'eca-chat-context-area)))
-                     (overlays-in (point-min) (point-max)))
+    (-some-> (eca-chat--prompt-context-field-ov)
       (overlay-start)
       (goto-char))
     (delete-region (point) (line-end-position))
@@ -728,11 +804,9 @@ If FORCE? decide to OPEN? or not."
         ("url" (eca-chat--add-header
                 (concat
                  "🌐 "
-                 (buttonize
+                 (eca-chat--buttonize
                   (plist-get content :title)
-                  (lambda(_) (browse-url (plist-get content :url)))
-                  nil
-                  (plist-get content :url))
+                  (lambda() (browse-url (plist-get content :url))))
                  "\n\n")))
         ("toolCallPrepare" (let* ((name (plist-get content :name))
                                   (origin (plist-get content :origin))
@@ -788,6 +862,7 @@ If FORCE? decide to OPEN? or not."
                       ("finished" (progn
                                     (eca-chat--spinner-stop)
                                     (eca-chat--add-text-content (propertize "\n" 'line-spacing 10))
+                                    (eca-chat--set-chat-loading nil)
                                     (setq-local eca-chat--progress-text "")))))))))
 
 (defun eca-chat--handle-mcp-server-updated (_server)
