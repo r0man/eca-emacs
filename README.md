@@ -24,7 +24,7 @@ For more details about ECA, check [ECA server](https://github.com/editor-code-as
 
 ## Installation
 
-### Melpa (wip)
+### Melpa
 
 ```
 M-x package-install eca
