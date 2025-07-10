@@ -86,6 +86,7 @@
 (define-derived-mode eca-mcp-details-mode fundamental-mode "eca-mcp-details"
   "Major mode for ECA mcp details."
   :group 'eca
+  (visual-line-mode)
   (eca-mcp--refresh-server-details))
 
 (defun eca-mcp--handle-mcp-server-updated (_server)
