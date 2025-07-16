@@ -2,7 +2,7 @@
 
 :warning: The project is still alpha and experimental, with bugs and missing features, but being consistenly improved.
 
-[![MELPA](https://melpa.org/packages/eca-emacs-badge.svg)](https://melpa.org/#/eca)
+[![MELPA](https://melpa.org/packages/eca-badge.svg)](https://melpa.org/#/eca)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 ![demo](./demo.gif)
