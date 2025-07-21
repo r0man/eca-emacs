@@ -25,13 +25,12 @@ If not provided, download and start eca automatically."
   :type '(repeat string))
 
 (defcustom eca-server-download-url
-  (format "https://github.com/editor-code-assistant/eca/releases/latest/download/eca-native-static-%s.zip"
+  (format "https://github.com/editor-code-assistant/eca/releases/latest/download/eca-native-%s.zip"
           (let ((arch (car (split-string system-configuration "-"))))
             (pcase system-type
-              ('gnu/linux (concat "linux-"
-                                  (cond
-                                   ((string= "x86_64" arch) "amd64")
-                                   (t arch))))
+              ('gnu/linux (cond
+                           ((string= "x86_64" arch) "static-linux-amd64")
+                           (t (concat "linux-" arch))))
               ('darwin (concat "macos-"
                                (cond
                                 ((string= "x86_64" arch) "amd64")
