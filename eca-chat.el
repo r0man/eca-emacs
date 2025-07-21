@@ -168,6 +168,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--progress-text "")
 (defvar-local eca-chat--last-user-message-pos nil)
 (defvar-local eca-chat--chat-loading nil)
+(defvar-local eca-chat--session-cost "0")
 
 (defvar eca-chat-buffer-name "<eca-chat>")
 
@@ -865,7 +866,9 @@ If FORCE? decide to OPEN? or not."
                                     (eca-chat--spinner-stop)
                                     (eca-chat--add-text-content (propertize "\n" 'line-spacing 10))
                                     (eca-chat--set-chat-loading nil)
-                                    (setq-local eca-chat--progress-text "")))))))))
+                                    (setq-local eca-chat--progress-text "")))))
+        ("usage" (let ((session-cost (plist-get content :sessionCost)))
+                   (setq-local eca-chat--session-cost session-cost)))))))
 
 (defun eca-chat--handle-mcp-server-updated (_server)
   "Handle mcp SERVER updated."
