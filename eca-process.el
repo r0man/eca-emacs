@@ -24,19 +24,8 @@ If not provided, download and start eca automatically."
   :risky t
   :type '(repeat string))
 
-(defcustom eca-server-download-url
-  (format "https://github.com/editor-code-assistant/eca/releases/latest/download/eca-native-%s.zip"
-          (let ((arch (car (split-string system-configuration "-"))))
-            (pcase system-type
-              ('gnu/linux (cond
-                           ((string= "x86_64" arch) "static-linux-amd64")
-                           (t (concat "linux-" arch))))
-              ('darwin (concat "macos-"
-                               (cond
-                                ((string= "x86_64" arch) "amd64")
-                                (t arch))))
-              ('windows-nt "windows-amd64"))))
-  "The URL to download eca server."
+(defcustom eca-server-download-url nil
+  "The custom URL to download eca server."
   :group 'eca
   :type 'string)
 
@@ -49,6 +38,15 @@ If not provided, download and start eca automatically."
   "Directory in which eca will be downloaded."
   :risky t
   :type 'directory
+  :group 'eca)
+
+(defcustom eca-server-version-file-path
+  (f-join (expand-file-name
+           (locate-user-emacs-file "eca"))
+          "eca-version")
+  "File in which eca version will be."
+  :risky t
+  :type 'string
   :group 'eca)
 
 (defconst eca-ext-pwsh-script "pwsh -noprofile -noninteractive \
@@ -78,6 +76,31 @@ If not provided, download and start eca automatically."
 
 (defvar eca-process--buffer-name "<eca>")
 (defvar eca-process--stderr-buffer-name "<eca:stderr>")
+(defvar eca-process--latest-server-version nil)
+
+(defun eca-process--get-latest-server-version ()
+  "Return the latest server version."
+  (or eca-process--latest-server-version
+      (condition-case _err
+          (let* ((releases-url "https://api.github.com/repos/editor-code-assistant/eca/releases")
+                 (buffer (url-retrieve-synchronously releases-url t t 30)))
+            (unless buffer
+              (error "Failed to retrieve releases list"))
+            (with-current-buffer buffer
+              ;; Skip HTTP headers
+              (goto-char (point-min))
+              (unless (search-forward "\n\n" nil t)
+                (error "Malformed HTTP response"))
+              (setq eca-process--latest-server-version (plist-get (elt (eca-api--json-read-buffer) 0) :tag_name))
+              (kill-buffer buffer))
+            eca-process--latest-server-version)
+        (error
+         nil))))
+
+(defun eca-process--get-current-server-version ()
+  "Return the current version of installed server if available."
+  (when (f-exists? eca-server-version-file-path)
+    (f-read eca-server-version-file-path)))
 
 (defun eca-process--download-and-store-path ()
   "Return the path of the download and store."
@@ -91,9 +114,25 @@ If not provided, download and start eca automatically."
     (when (f-exists? download-path) (f-delete download-path))
     (when (f-exists? store-path) (f-delete store-path))))
 
-(defun eca-process--download-server (on-downloaded)
-  "Download eca server calling ON-DOWNLOADED when success."
-  (-let ((url eca-server-download-url)
+(defun eca-process--download-url (version)
+  "Return the server download url for VERSION."
+  (or eca-server-download-url
+      (format "https://github.com/editor-code-assistant/eca/releases/download/%s/eca-native-%s.zip"
+              version
+              (let ((arch (car (split-string system-configuration "-"))))
+                (pcase system-type
+                  ('gnu/linux (cond
+                               ((string= "x86_64" arch) "static-linux-amd64")
+                               (t (concat "linux-" arch))))
+                  ('darwin (concat "macos-"
+                                   (cond
+                                    ((string= "x86_64" arch) "amd64")
+                                    (t arch))))
+                  ('windows-nt "windows-amd64"))))))
+
+(defun eca-process--download-server (on-downloaded version)
+  "Download eca server of VERSION calling ON-DOWNLOADED when success."
+  (-let ((url (eca-process--download-url version))
          ((download-path . store-path) (eca-process--download-and-store-path)))
     (make-thread
      (lambda ()
@@ -101,6 +140,7 @@ If not provided, download and start eca automatically."
            (progn
              (when (f-exists? download-path) (f-delete download-path))
              (when (f-exists? store-path) (f-delete store-path))
+             (when (f-exists? eca-server-version-file-path) (f-delete eca-server-version-file-path))
              (eca-info "Downloading eca server to %s..." download-path)
              (mkdir (f-parent download-path) t)
              (let ((inhibit-message t))
@@ -108,6 +148,7 @@ If not provided, download and start eca automatically."
              (unless eca-unzip-script
                (error "Unable to find `unzip' or `powershell' on the path, please customize `eca-unzip-script'"))
              (shell-command (format (funcall eca-unzip-script) download-path (f-parent store-path)))
+             (f-write-text version 'utf-8 eca-server-version-file-path)
              (eca-info "Downloaded eca successfully")
              (funcall on-downloaded))
          (error "Could not download eca server" err))))))
@@ -207,7 +248,9 @@ If not provided, download and start eca automatically."
   "Start the eca process calling ON-START after.
 Call HANDLE-MSG for new msgs processed."
   (unless (process-live-p (eca--session-process eca--session))
-    (let ((start-process-fn (lambda ()
+    (let ((latest-version (eca-process--get-latest-server-version))
+          (current-version (eca-process--get-current-server-version))
+          (start-process-fn (lambda ()
                               (eca-info "Starting process...")
                               (setf (eca--session-process eca--session)
                                     (make-process
@@ -225,10 +268,16 @@ Call HANDLE-MSG for new msgs processed."
                                      :file-handler t
                                      :noquery t))
                               (funcall on-start))))
-      (if (f-exists? eca-server-install-path)
+      (when (and (not (f-exists? eca-server-install-path))
+                 (not latest-version))
+        (user-error (eca-error "Could not fetch latest version of eca. Please check your internet connection and try again. You can also download eca manually and set the path via eca-custom-command variable")))
+
+      (if (and (f-exists? eca-server-install-path)
+               (string= latest-version current-version))
           (funcall start-process-fn)
         (eca-process--download-server (lambda ()
-                                (funcall start-process-fn)))))))
+                                        (funcall start-process-fn))
+                                      latest-version)))))
 
 (defun eca-process-running-p ()
   "Return non nil if eca process is running."
@@ -250,9 +299,10 @@ Call HANDLE-MSG for new msgs processed."
 
 ;;;###autoload
 (defun eca-install-server ()
-  "Download the eca server if not downloaded."
+  "Force download the latest eca server."
   (interactive)
-  (eca-process--download-server (lambda ())))
+  (eca-process--download-server (lambda ())
+                                (eca-process--get-latest-server-version)))
 
 ;;;###autoload
 (defun eca-uninstall-server ()
