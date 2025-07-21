@@ -89,6 +89,18 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :type 'string
   :group 'eca)
 
+(defcustom eca-chat-usage-string-format '(:message-cost " / " :session-cost)
+  "Format to show about chat usage tokens/costs."
+  :type '(repeat
+          (choice
+           (string :tag "any string like separators")
+           (const :tag "Last input tokens sent" :message-input-tokens)
+           (const :tag "Last output tokens received" :message-output-tokens)
+           (const :tag "Total tokens sent + received" :session-tokens)
+           (const :tag "Total session cost" :session-cost)
+           (const :tag "Last message cost" :mesage-cost)))
+  :group 'eca)
+
 ;; Faces
 
 (defface eca-chat-prompt-prefix-face
@@ -156,8 +168,14 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for the option values in header-line of the chat."
   :group 'eca)
 
+(defface eca-chat-usage-string-face
+  '((t :inherit font-lock-doc-face))
+  "Face for the strings segments in usage string in mode-line of the chat."
+  :group 'eca)
+
 ;; Internal
 
+(defvar-local eca-chat--closed nil)
 (defvar-local eca-chat--history '())
 (defvar-local eca-chat--history-index -1)
 (defvar-local eca-chat--id nil)
@@ -168,7 +186,11 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--progress-text "")
 (defvar-local eca-chat--last-user-message-pos nil)
 (defvar-local eca-chat--chat-loading nil)
-(defvar-local eca-chat--session-cost "0")
+(defvar-local eca-chat--session-cost nil)
+(defvar-local eca-chat--message-cost nil)
+(defvar-local eca-chat--message-input-tokens nil)
+(defvar-local eca-chat--message-output-tokens nil)
+(defvar-local eca-chat--session-tokens nil)
 
 (defvar eca-chat-buffer-name "<eca-chat>")
 
@@ -482,7 +504,31 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
 (defun eca-chat--mode-line-string ()
   "Update chat mode line."
-  (concat eca-chat--progress-text eca-chat--spinner-string))
+  (let* ((usage-str
+          (when (or eca-chat--message-input-tokens
+                    eca-chat--message-output-tokens
+                    eca-chat--session-tokens
+                    eca-chat--message-cost
+                    eca-chat--session-cost)
+            (-> (-map (lambda (segment)
+                        (pcase segment
+                          (:message-input-tokens (number-to-string eca-chat--message-input-tokens))
+                          (:message-output-tokens (number-to-string eca-chat--message-output-tokens))
+                          (:session-tokens (number-to-string eca-chat--session-tokens))
+                          (:message-cost (concat "$" eca-chat--message-cost))
+                          (:session-cost (concat "$" eca-chat--session-cost))
+                          (_ (propertize segment 'font-lock-face 'eca-chat-usage-string-face))))
+                      eca-chat-usage-string-format)
+                (string-join ""))))
+         (fill-space (propertize " "
+                                 'display `((space :align-to (- right ,(+ 1 (length usage-str))))))))
+    (concat
+     (when eca-chat--closed
+       (propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face))
+     eca-chat--progress-text
+     eca-chat--spinner-string
+     fill-space
+     usage-str)))
 
 (defun eca-chat--get-buffer ()
   "Get the eca chat buffer for current session."
@@ -726,7 +772,6 @@ If FORCE? decide to OPEN? or not."
   (unless (listp header-line-format)
     (setq-local header-line-format (list header-line-format)))
   (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line-string))))
-  (force-mode-line-update)
 
   (when (eq 0 (length (string-trim (buffer-string))))
     (save-excursion
@@ -867,8 +912,12 @@ If FORCE? decide to OPEN? or not."
                                     (eca-chat--add-text-content (propertize "\n" 'line-spacing 10))
                                     (eca-chat--set-chat-loading nil)
                                     (setq-local eca-chat--progress-text "")))))
-        ("usage" (let ((session-cost (plist-get content :sessionCost)))
-                   (setq-local eca-chat--session-cost session-cost)))))))
+        ("usage" (progn
+                   (setq-local eca-chat--message-input-tokens (plist-get content :messageInputTokens))
+                   (setq-local eca-chat--message-output-tokens (plist-get content :messageOutputTokens))
+                   (setq-local eca-chat--session-tokens (plist-get content :sessionTokens))
+                   (setq-local eca-chat--message-cost (plist-get content :messageCost))
+                   (setq-local eca-chat--session-cost (plist-get content :sessionCost))))))))
 
 (defun eca-chat--handle-mcp-server-updated (_server)
   "Handle mcp SERVER updated."
@@ -895,8 +944,9 @@ If FORCE? decide to OPEN? or not."
   "Exit the ECA chat."
   (when (buffer-live-p (get-buffer eca-chat-buffer-name))
     (with-current-buffer (eca-chat--get-buffer)
+      (setq eca-chat--closed t)
+      (force-mode-line-update)
       (goto-char (point-max))
-      (setq-local mode-line-format `(,(propertize "*Closed session*" 'font-lock-face 'eca-chat-system-messages-face)))
       (rename-buffer (concat (buffer-name) ":closed") t)
       (when-let* ((window (get-buffer-window (eca-chat--get-buffer))))
         (quit-window nil window)))))

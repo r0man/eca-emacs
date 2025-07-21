@@ -65,6 +65,11 @@ accuracy and transcription speed.
   (whisper-model "small"))
 ```
 
+## Optional interesting settings
+
+- `eca-chat-usage-string-format`: to customize what shows on mode-line for usage like costs and tokens.
+- `eca-chat-position-params`: customize the chat window.
+
 ## Contributing
 
 Contributions are very welcome, please open a issue for discussion or pull request.
