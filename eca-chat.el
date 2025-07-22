@@ -201,7 +201,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "C-<up>") #'eca-chat--key-pressed-previous-prompt-history)
     (define-key map (kbd "C-<down>") #'eca-chat--key-pressed-next-prompt-history)
-    (define-key map (kbd "C-k") #'eca-chat-restart)
+    (define-key map (kbd "C-k") #'eca-chat-reset)
     (define-key map (kbd "C-l") #'eca-chat-clear)
     (define-key map (kbd "C-t") #'eca-chat-talk)
     (define-key map (kbd "<return>") #'eca-chat--key-pressed-return)
@@ -974,11 +974,18 @@ If FORCE? decide to OPEN? or not."
     (setq eca-chat-custom-behavior behavior)))
 
 ;;;###autoload
-(defun eca-chat-restart ()
-  "Stop any existing chat and start a new one."
+(defun eca-chat-reset ()
+  "Request a chat reset."
   (interactive)
-  (eca-chat-exit)
-  (eca-chat-open))
+  (when eca-chat--id
+    (eca-api-request-sync :method "chat/delete"
+                          :params (list :chatId eca-chat--id))
+    (setq-local eca-chat--message-input-tokens nil)
+    (setq-local eca-chat--message-output-tokens nil)
+    (setq-local eca-chat--session-tokens nil)
+    (setq-local eca-chat--message-cost nil)
+    (setq-local eca-chat--session-cost nil)
+    (eca-chat--clear)))
 
 (declare-function whisper-run "ext:whisper" ())
 
