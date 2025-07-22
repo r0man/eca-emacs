@@ -113,6 +113,16 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for the stop action when loading."
   :group 'eca)
 
+(defface eca-chat-tool-call-run-face
+  '((t (:inherit success :underline t :weight bold)))
+  "Face for the run tool call action."
+  :group 'eca)
+
+(defface eca-chat-tool-call-cancel-face
+  '((t (:inherit error :underline t :weight bold)))
+  "Face for the cancel tool call action."
+  :group 'eca)
+
 (defface eca-chat-context-unlinked-face
   '((t (:foreground "gold")))
   "Face for contexts to be added."
@@ -444,16 +454,16 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
          :success-callback (-lambda (res)
                              (setq-local eca-chat--id (plist-get res :chatId)))))
 
-       ;; check is inside a expandable text
-       ((eca-chat--expandable-content-at-point)
-        (let ((ov (eca-chat--expandable-content-at-point)))
-          (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))))
-
        ;; check it's an actionable text
        ((-some->> (thing-at-point 'symbol) (get-text-property 0 'eca-chat-on-action))
         (-some->> (thing-at-point 'symbol)
           (get-text-property 0 'eca-chat-on-action)
           (funcall)))
+
+       ;; check is inside a expandable text
+       ((eca-chat--expandable-content-at-point)
+        (let ((ov (eca-chat--expandable-content-at-point)))
+          (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id))))
 
        (t nil)))))
 
@@ -871,7 +881,8 @@ If FORCE? decide to OPEN? or not."
         ("toolCallRun" (let* ((name (plist-get content :name))
                               (origin (plist-get content :origin))
                               (args (plist-get content :arguments))
-                              (id (plist-get content :id)))
+                              (id (plist-get content :id))
+                              (manual? (plist-get content :manualApproval)))
                          (eca-chat--rename-expandable-content
                           id
                           (concat (propertize (format "Calling %s tool: "
@@ -879,8 +890,34 @@ If FORCE? decide to OPEN? or not."
                                               'font-lock-face 'eca-chat-mcp-tool-call-label-face)
                                   (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
                                   " "
-                                  eca-chat-mcp-tool-call-loading-symbol)
+                                  eca-chat-mcp-tool-call-loading-symbol
+                                  (when manual?
+                                    (concat
+                                     " "
+                                     (eca-chat--buttonize
+                                      (propertize "cancel" 'font-lock-face 'eca-chat-tool-call-cancel-face)
+                                      (lambda () (eca-api-notify :method "chat/toolCallReject"
+                                                                 :params (list :chatId eca-chat--id :toolCallId id))))
+                                     " "
+                                     (eca-chat--buttonize
+                                      (propertize "run" 'font-lock-face 'eca-chat-tool-call-run-face)
+                                      (lambda () (eca-api-notify :method "chat/toolCallApprove"
+                                                                 :params (list :chatId eca-chat--id :toolCallId id))))
+                                     )))
                           (eca-chat--content-table `(("arguments" . ,args))))))
+        ("toolCallRejected" (let* ((name (plist-get content :name))
+                                   (origin (plist-get content :origin))
+                                   (args (plist-get content :arguments))
+                                   (id (plist-get content :id)))
+                              (eca-chat--rename-expandable-content
+                               id
+                               (concat (propertize (format "Rejected %s tool: "
+                                                           (if (string= "mcp" origin) "MCP" "ECA"))
+                                                   'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                       (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                       " "
+                                       eca-chat-mcp-tool-call-error-symbol)
+                               (eca-chat--content-table `(("arguments" . ,args))))))
         ("toolCalled" (let* ((id (plist-get content :id))
                              (name (plist-get content :name))
                              (origin (plist-get content :origin))
