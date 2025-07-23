@@ -133,6 +133,11 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for contexts of file type."
   :group 'eca)
 
+(defface eca-chat-context-repo-map-face
+  '((t (:foreground "turquoise" :underline t)))
+  "Face for contexts of repoMap type."
+  :group 'eca)
+
 (defface eca-chat-user-messages-face
   '((t :inherit font-lock-doc-face))
   "Face for the user sent messages in chat."
@@ -450,7 +455,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                        :chatId eca-chat--id
                        :model (eca-chat--model)
                        :behavior (eca-chat--behavior)
-                       :contexts (eca-chat--contexts->request))
+                       :contexts (vconcat eca-chat--context))
          :success-callback (-lambda (res)
                              (setq-local eca-chat--id (plist-get res :chatId)))))
 
@@ -698,31 +703,27 @@ If FORCE? decide to OPEN? or not."
       (goto-char))
     (delete-region (point) (line-end-position))
     (seq-doseq (context eca-chat--context)
-      (-let (((&plist :value value :type type) context))
-        (pcase type
-          ("file" (let ((text (concat eca-chat-context-prefix (f-filename value))))
-                    (insert (propertize text
-                                        'eca-chat-context-item context
-                                        'font-lock-face 'eca-chat-context-file-face))
-                    (insert " ")))
-          ("directory" (let ((text (concat eca-chat-context-prefix (f-filename value))))
-                         (insert (propertize text
-                                             'eca-chat-context-item context
-                                             'font-lock-face 'eca-chat-context-file-face))
-                         (insert " "))))))
+      (-let (((&plist :type type) context))
+        (insert
+         (pcase type
+           ("file" (propertize (concat eca-chat-context-prefix (f-filename (plist-get context :path)))
+                               'eca-chat-context-item context
+                               'font-lock-face 'eca-chat-context-file-face))
+           ("directory" (propertize (concat eca-chat-context-prefix (f-filename (plist-get context :path)))
+                                    'eca-chat-context-item context
+                                    'font-lock-face 'eca-chat-context-file-face))
+           ("repoMap" (propertize (concat eca-chat-context-prefix "repoMap")
+                                  'eca-chat-context-item context
+                                  'font-lock-face 'eca-chat-context-repo-map-face))
+           (_ (propertize (concat eca-chat-context-prefix "unkown:" type)
+                          'eca-chat-context-item context))))
+        (insert " ")))
     (insert (propertize eca-chat-context-prefix 'font-lock-face 'eca-chat-context-unlinked-face))))
-
-(defun eca-chat--contexts->request ()
-  "Convert contexts to a requestable structure."
-  (vconcat (-map (-lambda ((&plist :type type :value value))
-                   (pcase type
-                     ("file" (list :type "file" :path value))
-                     ("directory" (list :type "directory" :path value))))
-                 eca-chat--context)) )
 
 (defconst eca-chat--kind->symbol
   '(("file" . file)
-    ("directory" . folder)))
+    ("directory" . folder)
+    ("repoMap" . module)))
 
 (defun eca-chat--completion-candidate-kind (item)
   "Return the kind for ITEM."
@@ -732,11 +733,9 @@ If FORCE? decide to OPEN? or not."
              nil
              #'string=))
 
-(defun eca-chat--add-context (type value)
-  "Add to chat context VALUE of TYPE."
-  (pcase type
-    ("file" (add-to-list 'eca-chat--context (list :type "file" :value value) t))
-    ("directory" (add-to-list 'eca-chat--context (list :type "directory" :value value) t)))
+(defun eca-chat--add-context (context)
+  "Add to chat CONTEXT."
+  (add-to-list 'eca-chat--context context t)
   (eca-chat--refresh-context))
 
 (defun eca-chat--completion-annotate (roots item-label)
@@ -744,14 +743,13 @@ If FORCE? decide to OPEN? or not."
   (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
     (pcase type
       ("file" (eca-chat--relativize-filename-for-workspace-root path roots))
-      ("directory" (eca-chat--relativize-filename-for-workspace-root path roots)))))
+      ("directory" (eca-chat--relativize-filename-for-workspace-root path roots))
+      ("repoMap" "Summary view of workspaces files")
+      (_ ""))))
 
 (defun eca-chat--completion-exit-function (item _status)
   "Add to context the selected ITEM."
-  (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item)))
-    (pcase type
-      ("file" (eca-chat--add-context type path))
-      ("directory" (eca-chat--add-context type path))))
+  (eca-chat--add-context (get-text-property 0 'eca-chat-completion-item item))
   (end-of-line))
 
 (defun eca-chat--context-to-completion (context)
@@ -759,7 +757,9 @@ If FORCE? decide to OPEN? or not."
   (propertize
    (pcase (plist-get context :type)
      ("file" (f-filename (plist-get context :path)))
-     ("directory" (f-filename (plist-get context :path))))
+     ("directory" (f-filename (plist-get context :path)))
+     ("repoMap" "repoMap")
+     (_ (concat "Unknown - " (plist-get context :type))))
    'eca-chat-completion-item context))
 
 ;; Public
@@ -816,7 +816,7 @@ If FORCE? decide to OPEN? or not."
                                                              :method "chat/queryContext"
                                                              :params (list :chatId eca-chat--id
                                                                            :query (thing-at-point 'symbol t)
-                                                                           :contexts (eca-chat--contexts->request)))))
+                                                                           :contexts (vconcat eca-chat--context)))))
                           (-map #'eca-chat--context-to-completion contexts)))
                        (t nil)))))
     (list
@@ -825,13 +825,13 @@ If FORCE? decide to OPEN? or not."
      (point)
      (lambda (probe pred action)
        (cond
-          ((eq action 'metadata)
-           '(metadata (category . eca-capf)
-                      (display-sort-function . identity)
-                      (cycle-sort-function . identity)))
-          ((eq (car-safe action) 'boundaries) nil)
-          (t
-           (complete-with-action action (funcall candidates) probe pred))))
+        ((eq action 'metadata)
+         '(metadata (category . eca-capf)
+           (display-sort-function . identity)
+           (cycle-sort-function . identity)))
+        ((eq (car-safe action) 'boundaries) nil)
+        (t
+         (complete-with-action action (funcall candidates) probe pred))))
      :company-kind #'eca-chat--completion-candidate-kind
      :annotation-function (-partial #'eca-chat--completion-annotate (eca--session-workspace-folders eca--session))
      :exit-function #'eca-chat--completion-exit-function)))
@@ -963,19 +963,17 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-open ()
   "Open or create dedicated eca chat window."
   (eca-assert-session-running)
-  (let ((source-buffer (current-buffer)))
-    (unless (buffer-live-p (eca-chat--get-buffer))
-      (eca-chat--create-buffer))
-    (with-current-buffer (eca-chat--get-buffer)
-      (unless (derived-mode-p 'eca-chat-mode)
-        (eca-chat-mode))
-      (unless (eca--session-chat eca--session)
-        (setf (eca--session-chat eca--session) (current-buffer)))
-      (when-let* ((file-name (buffer-file-name source-buffer)))
-        (eca-chat--add-context "file" file-name))
-      (if (window-live-p (get-buffer-window (buffer-name)))
-          (eca-chat--select-window)
-        (eca-chat--pop-window)))))
+  (unless (buffer-live-p (eca-chat--get-buffer))
+    (eca-chat--create-buffer))
+  (with-current-buffer (eca-chat--get-buffer)
+    (unless (derived-mode-p 'eca-chat-mode)
+      (eca-chat-mode)
+      (eca-chat--add-context (list :type "repoMap")))
+    (unless (eca--session-chat eca--session)
+      (setf (eca--session-chat eca--session) (current-buffer)))
+    (if (window-live-p (get-buffer-window (buffer-name)))
+        (eca-chat--select-window)
+      (eca-chat--pop-window))))
 
 (defun eca-chat-exit ()
   "Exit the ECA chat."
