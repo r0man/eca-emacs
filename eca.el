@@ -130,6 +130,7 @@
                        (setf (eca--session-chat-behaviors eca--session) chat-behaviors)
                        (setf (eca--session-chat-default-model eca--session) chat-default-model)
                        (setf (eca--session-chat-default-behavior eca--session) chat-default-behavior)
+                       (eca-api-notify :method "initialized")
                        (eca-info "Started!")
                        (eca-chat-open)
                        (run-hooks 'eca-after-initialize-hook))
