@@ -141,10 +141,9 @@ If not provided, download and start eca automatically."
              (when (f-exists? download-path) (f-delete download-path))
              (when (f-exists? store-path) (f-delete store-path))
              (when (f-exists? eca-server-version-file-path) (f-delete eca-server-version-file-path))
-             (eca-info "Downloading eca server to %s..." download-path)
              (mkdir (f-parent download-path) t)
-             (let ((inhibit-message t))
-               (url-copy-file url download-path))
+             (eca-info "Downloading eca server from %s to %s..."  url download-path)
+             (url-copy-file url download-path)
              (unless eca-unzip-script
                (error "Unable to find `unzip' or `powershell' on the path, please customize `eca-unzip-script'"))
              (shell-command (format (funcall eca-unzip-script) download-path (f-parent store-path)))
