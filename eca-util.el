@@ -20,6 +20,10 @@
   (cons (cons key val)
         (cl-remove-if (lambda (pair) (equal (car pair) key)) map)))
 
+(defun eca-dissoc (map key)
+  "Return a new MAP with KEY removed."
+  (cl-remove-if (lambda (pair) (equal (car pair) key)) map))
+
 (defun eca-get (map key)
   "Return the plist value associated with KEY in MAP, or nil."
   (let ((pair (cl-find key map :key #'car :test #'equal)))
@@ -62,8 +66,8 @@
   ;; The suported models by the server.
   (models '())
 
-  ;; The mcp servers and their status.
-  (mcp-servers '())
+  ;; The servers and their status.
+  (tool-servers '())
 
   ;; Default model to use in the chat returned by server.
   (chat-default-model nil)

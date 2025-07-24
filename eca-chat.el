@@ -263,7 +263,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
                             (concat
                              (propertize (number-to-string n) 'font-lock-face face)
                              (when add-slash? (propertize "/" 'font-lock-face 'font-lock-comment-face))))))
-         (mcp-servers (eca-vals (eca--session-mcp-servers eca--session))))
+         (mcp-servers (eca-mcp-servers)))
     (if (seq-empty-p mcp-servers)
         "0"
       (progn

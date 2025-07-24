@@ -50,7 +50,7 @@
       (seq-doseq (server (-sort  (lambda (a b)
                                    (string-lessp (plist-get a :name)
                                                  (plist-get b :name)))
-                                 (eca-vals (eca--session-mcp-servers eca--session))))
+                                 (eca-vals (eca--session-tool-servers eca--session))))
         (-let (((&plist :name name :command command :args args
                         :status status :tools tools) server))
           (insert (propertize name 'font-lock-face 'bold))
@@ -69,9 +69,10 @@
               (insert (propertize "Tools: " 'font-lock-face font-lock-doc-face))
               (seq-doseq (tool tools)
                 (insert (propertize (plist-get tool :name) 'font-lock-face 'eca-mcp-details-tool-face) " "))))
-          (insert "\n")
-          (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
-          (insert command " " (string-join args " "))
+          (when command
+            (insert "\n")
+            (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
+            (insert command " " (string-join args " ")))
           (when (string= "failed" status)
             (insert "\n")
             (insert (propertize (format "Failed to start, check %s for details"
@@ -88,6 +89,10 @@
   :group 'eca
   (visual-line-mode)
   (eca-mcp--refresh-server-details))
+
+(defun eca-mcp-servers ()
+  "Return all servers that are not from eca server, the MCP servers."
+  (eca-vals (eca-dissoc (eca--session-tool-servers eca--session) 'ECA)))
 
 (defun eca-mcp--handle-mcp-server-updated (_server)
   "Handle mcp SERVER updated."

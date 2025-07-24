@@ -64,10 +64,10 @@
       ("warning" (eca-warn msg))
       ("info" (eca-info msg)))))
 
-(defun eca--mcp-server-updated (server)
-  "Handle MCP server updated message with SERVER."
-  (setf (eca--session-mcp-servers eca--session)
-        (eca-assoc (eca--session-mcp-servers eca--session)
+(defun eca--tool-server-updated (server)
+  "Handle tool server updated message with SERVER."
+  (setf (eca--session-tool-servers eca--session)
+        (eca-assoc (eca--session-tool-servers eca--session)
                    (plist-get server :name)
                    server))
   (eca-chat--handle-mcp-server-updated server)
@@ -79,7 +79,7 @@
         (params (plist-get notification :params)))
     (pcase method
       ("chat/contentReceived" (eca-chat-content-received params))
-      ("tool/serverUpdated" (eca--mcp-server-updated params))
+      ("tool/serverUpdated" (eca--tool-server-updated params))
       ("$/showMessage" (eca--handle-show-message params))
       (_ (eca-warn "Unknown notification %s" method)))))
 
