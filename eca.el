@@ -79,7 +79,7 @@
         (params (plist-get notification :params)))
     (pcase method
       ("chat/contentReceived" (eca-chat-content-received params))
-      ("mcp/serverUpdated" (eca--mcp-server-updated params))
+      ("tool/serverUpdated" (eca--mcp-server-updated params))
       ("$/showMessage" (eca--handle-show-message params))
       (_ (eca-warn "Unknown notification %s" method)))))
 
