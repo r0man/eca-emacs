@@ -155,10 +155,29 @@ If not provided, download and start eca automatically."
 
 (defun eca-process--server-command ()
   "Return the command to start server."
-  (or eca-custom-command
-      (when-let* ((command (executable-find "eca")))
-        (list command "server"))
-      (list eca-server-install-path "server")))
+  (let ((system-command (executable-find "eca")))
+    (cond
+     (eca-custom-command (list :decision 'custom
+                               :command eca-custom-command))
+
+     (system-command
+      (list :decision 'system
+            :command (list system-command "server")))
+
+     ((and (not (f-exists? eca-server-install-path))
+           (not (eca-process--get-latest-server-version)))
+      (list :decision 'error-download
+            :message "Could not fetch latest version of eca. Please check your internet connection and try again. You can also download eca manually and set the path via eca-custom-command variable"))
+
+     ((and (f-exists? eca-server-install-path)
+           (string= (eca-process--get-latest-server-version)
+                    (eca-process--get-current-server-version)))
+      (list :decision 'already-installed
+            :command (list eca-server-install-path "server")))
+
+     (t (list :decision 'download
+              :latest-version (eca-process--get-latest-server-version)
+              :command (list eca-server-install-path "server"))))))
 
 (defun eca-process--parse-header (s)
   "Parse string S as a ECA (KEY . VAL) header."
@@ -248,40 +267,37 @@ If not provided, download and start eca automatically."
   "Start the eca process calling ON-START after.
 Call HANDLE-MSG for new msgs processed."
   (unless (process-live-p (eca--session-process eca--session))
-    (let ((latest-version (eca-process--get-latest-server-version))
-          (current-version (eca-process--get-current-server-version))
-          (start-process-fn (lambda ()
-                              (eca-info "Starting process...")
-                              (setf (eca--session-process eca--session)
-                                    (make-process
-                                     :coding 'no-conversion
-                                     :connection-type 'pipe
-                                     :name "eca"
-                                     :command (eca-process--server-command)
-                                     :buffer eca-process--buffer-name
-                                     :stderr (get-buffer-create eca-process--stderr-buffer-name)
-                                     :filter (-partial #'eca-process--filter handle-msg)
-                                     :sentinel (lambda (process exit-str)
-                                                 (unless (process-live-p process)
-                                                   (setq eca--session nil)
-                                                   (eca-info "process has exited (%s)" (s-trim exit-str))))
-                                     :file-handler t
-                                     :noquery t))
-                              (funcall on-start))))
-      (cond
-       (eca-custom-command (funcall start-process-fn))
+    (-let* (((result &as &plist :decision decision :command command) (eca-process--server-command))
+            (start-process-fn (lambda ()
+                                (eca-info "Starting process..." (string-join command " "))
+                                (setf (eca--session-process eca--session)
+                                      (make-process
+                                       :coding 'no-conversion
+                                       :connection-type 'pipe
+                                       :name "eca"
+                                       :command command
+                                       :buffer eca-process--buffer-name
+                                       :stderr (get-buffer-create eca-process--stderr-buffer-name)
+                                       :filter (-partial #'eca-process--filter handle-msg)
+                                       :sentinel (lambda (process exit-str)
+                                                   (unless (process-live-p process)
+                                                     (setq eca--session nil)
+                                                     (eca-info "process has exited (%s)" (s-trim exit-str))))
+                                       :file-handler t
+                                       :noquery t))
+                                (funcall on-start))))
+      (pcase decision
+        ('custom (funcall start-process-fn))
 
-       ((and (not (f-exists? eca-server-install-path))
-             (not latest-version))
-        (user-error (eca-error "Could not fetch latest version of eca. Please check your internet connection and try again. You can also download eca manually and set the path via eca-custom-command variable")))
+        ('system (funcall start-process-fn))
 
-       ((and (f-exists? eca-server-install-path)
-             (string= latest-version current-version))
-        (funcall start-process-fn))
+        ('error-download (user-error (eca-error (plist-get result :message))))
 
-       (t (eca-process--download-server (lambda ()
-                                          (funcall start-process-fn))
-                                        latest-version))))))
+        ('already-installed (funcall start-process-fn))
+
+        ('download (eca-process--download-server (lambda ()
+                                                   (funcall start-process-fn))
+                                                 (plist-get result :latest-version)))))))
 
 (defun eca-process-running-p ()
   "Return non nil if eca process is running."
