@@ -268,16 +268,20 @@ Call HANDLE-MSG for new msgs processed."
                                      :file-handler t
                                      :noquery t))
                               (funcall on-start))))
-      (when (and (not (f-exists? eca-server-install-path))
-                 (not latest-version))
+      (cond
+       (eca-custom-command (funcall start-process-fn))
+
+       ((and (not (f-exists? eca-server-install-path))
+             (not latest-version))
         (user-error (eca-error "Could not fetch latest version of eca. Please check your internet connection and try again. You can also download eca manually and set the path via eca-custom-command variable")))
 
-      (if (and (f-exists? eca-server-install-path)
-               (string= latest-version current-version))
-          (funcall start-process-fn)
-        (eca-process--download-server (lambda ()
-                                        (funcall start-process-fn))
-                                      latest-version)))))
+       ((and (f-exists? eca-server-install-path)
+             (string= latest-version current-version))
+        (funcall start-process-fn))
+
+       (t (eca-process--download-server (lambda ()
+                                          (funcall start-process-fn))
+                                        latest-version))))))
 
 (defun eca-process-running-p ()
   "Return non nil if eca process is running."
