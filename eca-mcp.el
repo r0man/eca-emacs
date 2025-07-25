@@ -28,6 +28,11 @@
   "Face for tools showed in mcp details buffer."
   :group 'eca)
 
+(defface eca-mcp-details-tool-disabled-face
+  '((t (:inherit hl-line :slant italic :strike-through t)))
+  "Face for tools showed in mcp details buffer."
+  :group 'eca)
+
 ;; Internal
 
 (defvar eca-mcp-details-buffer-name "<eca-mcp-details>")
@@ -68,7 +73,10 @@
             (progn
               (insert (propertize "Tools: " 'font-lock-face font-lock-doc-face))
               (seq-doseq (tool tools)
-                (insert (propertize (plist-get tool :name) 'font-lock-face 'eca-mcp-details-tool-face) " "))))
+                (insert (propertize (plist-get tool :name)
+                                    'font-lock-face (if (plist-get tool :disabled)
+                                                        'eca-mcp-details-tool-disabled-face
+                                                        'eca-mcp-details-tool-face)) " "))))
           (when command
             (insert "\n")
             (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
@@ -92,7 +100,7 @@
 
 (defun eca-mcp-servers ()
   "Return all servers that are not from eca server, the MCP servers."
-  (eca-vals (eca-dissoc (eca--session-tool-servers eca--session) 'ECA)))
+  (eca-vals (eca-dissoc (eca--session-tool-servers eca--session) "ECA")))
 
 (defun eca-mcp--handle-mcp-server-updated (_server)
   "Handle mcp SERVER updated."
