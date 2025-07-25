@@ -148,6 +148,11 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for the system messages in chat."
   :group 'eca)
 
+(defface eca-chat-reason-label-face
+  '((t :inherit font-lock-comment-face :underline t))
+  "Face for the reason messages in chat."
+  :group 'eca)
+
 (defface eca-chat-mcp-tool-call-label-face
   '((t :inherit font-lock-keyword-face :underline t))
   "Face for the MCP tool calls in chat."
@@ -865,6 +870,16 @@ If FORCE? decide to OPEN? or not."
                   (plist-get content :title)
                   (lambda() (browse-url (plist-get content :url))))
                  "\n\n")))
+        ("reasonStarted" (let ((id (plist-get content :id))
+                               (label (propertize "Thinking..." 'font-lock-face 'eca-chat-reason-label-face)))
+                           (eca-chat--add-expandable-content id label "")))
+        ("reasonText" (let ((text (plist-get content :text))
+                            (id (plist-get content :id))
+                            (label (propertize "Thinking..." 'font-lock-face 'eca-chat-reason-label-face)))
+                        (eca-chat--rename-expandable-content id label text t)))
+        ("reasonFinished" (let ((id (plist-get content :id))
+                                (label (propertize "Thoughts" 'font-lock-face 'eca-chat-reason-label-face)))
+                            (eca-chat--rename-expandable-content id label "" t)))
         ("toolCallPrepare" (let* ((name (plist-get content :name))
                                   (origin (plist-get content :origin))
                                   (argsText (plist-get content :argumentsText))
