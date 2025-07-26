@@ -32,8 +32,8 @@
   "Read json from the current buffer."
   (if (fboundp 'json-parse-buffer)
       `(json-parse-buffer :object-type 'plist
-                          :null-object nil
-                          :false-object nil)
+        :null-object nil
+        :false-object nil)
     `(let ((json-array-type 'vector)
            (json-object-type 'plist)
            (json-false nil))
@@ -57,31 +57,32 @@
             body
             "\n")))
 
-(defun eca-api--send! (body)
-  "Send to process the BODY."
+(defun eca-api--send! (session body)
+  "Send to SESSION process the BODY."
   (condition-case err
-      (process-send-string (eca--session-process eca--session) (eca-api--make-message body))
+      (process-send-string (eca--session-process session) (eca-api--make-message body))
     (error (eca-error "Sending to process failed with the following error: %s"
                       (error-message-string err)))))
 
 ;; Public
 
-(cl-defun eca-api-request-async (&key method params success-callback error-callback)
-  "Request async the ECA server passing METHOD and PARAMS.
+(cl-defun eca-api-request-async (session &key method params success-callback error-callback)
+  "Request async the ECA server SESSION passing METHOD and PARAMS.
 Call SUCCESS-CALLBACK when success or ERROR-CALLBACK when error."
   (let* ((id (cl-incf eca--last-id))
          (body `(:jsonrpc "2.0" :method ,method :params ,params :id ,id)))
-    (setf (eca--session-response-handlers eca--session)
-        (plist-put (eca--session-response-handlers eca--session) id (list success-callback error-callback)))
-    (eca-api--send! body)))
+    (setf (eca--session-response-handlers session)
+          (plist-put (eca--session-response-handlers session) id (list success-callback error-callback)))
+    (eca-api--send! session body)))
 
-(cl-defun eca-api-request-sync (&key method params)
-  "Request sync the ECA server passing METHOD and PARAMS."
+(cl-defun eca-api-request-sync (session &key method params)
+  "Request sync the ECA server SESSION passing METHOD and PARAMS."
   (let* ((send-time (float-time))
          (expected-time (and eca-api-response-timeout
                              (+ send-time eca-api-response-timeout)))
          resp-result resp-error)
     (eca-api-request-async
+     session
      :method method
      :params params
      :success-callback (lambda (res) (setf resp-result (or res :finished)) (throw 'eca-done '_))
@@ -101,10 +102,10 @@ Call SUCCESS-CALLBACK when success or ERROR-CALLBACK when error."
      (resp-result resp-result)
      (resp-error (error resp-error)))))
 
-(cl-defun eca-api-notify (&key method params)
-  "Notify sync the ECA server passing METHOD and PARAMS."
+(cl-defun eca-api-notify (session &key method params)
+  "Notify sync the ECA server SESSION passing METHOD and PARAMS."
   (let* ((body `(:jsonrpc "2.0" :method ,method :params ,params)))
-    (eca-api--send! body)))
+    (eca-api--send! session body)))
 
 (provide 'eca-api)
 ;;; eca-api.el ends here

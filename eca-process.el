@@ -74,8 +74,14 @@ If not provided, download and start eca automatically."
   :group 'eca
   :type 'string)
 
-(defvar eca-process--buffer-name "<eca>")
-(defvar eca-process--stderr-buffer-name "<eca:stderr>")
+(defun eca-process--buffer-name (session)
+  "Return the process buffer name for SESSION."
+  (format  "<eca:%s>" (eca--session-id session)))
+
+(defun eca-process--stderr-buffer-name (session)
+  "Return the stderr buffer name for SESSION."
+  (format  "<eca:stderr:%s>" (eca--session-id session)))
+
 (defvar eca-process--latest-server-version nil)
 
 (defun eca-process--get-latest-server-version ()
@@ -193,8 +199,11 @@ If not provided, download and start eca automatically."
                  nil (format "Invalid Content-Length value: %s" val)))
     (cons key val)))
 
-(defun eca-process--filter (handle-msg _proc raw-output)
-  "Process filter to parse eca's stdout RAW-OUTPUT delivering to HANDLE-MSG."
+(defun eca-process--filter (handle-msg session _proc raw-output)
+  "Process filter to parse eca's stdout RAW-OUTPUT delivering to HANDLE-MSG.
+Set cache for SESSION."
+  (unless eca--session-cache
+    (setq eca--session-cache session))
   (let ((body-received 0)
         leftovers body-length body chunk)
     (setf chunk (if (s-blank? leftovers)
@@ -262,25 +271,25 @@ If not provided, download and start eca automatically."
 
 ;; Public
 
-(defun eca-process-start (on-start handle-msg)
-  "Start the eca process calling ON-START after.
+(defun eca-process-start (session on-start handle-msg)
+  "Start the eca process for SESSION calling ON-START after.
 Call HANDLE-MSG for new msgs processed."
-  (unless (process-live-p (eca--session-process eca--session))
+  (unless (process-live-p (eca--session-process session))
     (-let* (((result &as &plist :decision decision :command command) (eca-process--server-command))
             (start-process-fn (lambda ()
                                 (eca-info "Starting process..." (string-join command " "))
-                                (setf (eca--session-process eca--session)
+                                (setf (eca--session-process session)
                                       (make-process
                                        :coding 'no-conversion
                                        :connection-type 'pipe
                                        :name "eca"
                                        :command command
-                                       :buffer eca-process--buffer-name
-                                       :stderr (get-buffer-create eca-process--stderr-buffer-name)
-                                       :filter (-partial #'eca-process--filter handle-msg)
+                                       :buffer (eca-process--buffer-name session)
+                                       :stderr (get-buffer-create (eca-process--stderr-buffer-name session))
+                                       :filter (-partial #'eca-process--filter handle-msg session)
                                        :sentinel (lambda (process exit-str)
                                                    (unless (process-live-p process)
-                                                     (setq eca--session nil)
+                                                     (eca-delete-session session)
                                                      (eca-info "process has exited (%s)" (s-trim exit-str))))
                                        :file-handler t
                                        :noquery t))
@@ -298,20 +307,21 @@ Call HANDLE-MSG for new msgs processed."
                                                    (funcall start-process-fn))
                                                  (plist-get result :latest-version)))))))
 
-(defun eca-process-running-p ()
-  "Return non nil if eca process is running."
-  (and eca--session
-       (process-live-p (eca--session-process eca--session))))
+(defun eca-process-running-p (session)
+  "Return non nil if eca process for SESSION is running."
+  (and session
+       (process-live-p (eca--session-process session))))
 
-(defun eca-process-stop ()
-  "Stop the eca process if running."
-  (kill-process (eca--session-process eca--session))
-  (kill-buffer eca-process--buffer-name))
+(defun eca-process-stop (session)
+  "Stop the eca process for SESSION if running."
+  (when session
+    (kill-process (eca--session-process session))
+    (kill-buffer (eca-process--buffer-name session))))
 
-(defun eca-process-show-stderr ()
-  "Open the eca process stderr buffer if running."
+(defun eca-process-show-stderr (session)
+  "Open the eca process stderr buffer for SESSION if running."
   (interactive)
-  (with-current-buffer eca-process--stderr-buffer-name
+  (with-current-buffer (eca-process--stderr-buffer-name session)
     (if (window-live-p (get-buffer-window (buffer-name)))
         (select-window (get-buffer-window (buffer-name)))
       (display-buffer (current-buffer)))))

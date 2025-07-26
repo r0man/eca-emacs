@@ -212,7 +212,9 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--message-output-tokens nil)
 (defvar-local eca-chat--session-tokens nil)
 
-(defvar eca-chat-buffer-name "<eca-chat>")
+(defun eca-chat-buffer-name (session)
+  "Return the chat buffer name for SESSION."
+  (format  "<eca-chat:%s>" (eca--session-id session)))
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
@@ -229,15 +231,15 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     map)
   "Keymap used by `eca-chat-mode'.")
 
-(defun eca-chat--spinner-start ()
-  "Start modeline spinner."
+(defun eca-chat--spinner-start (session)
+  "Start modeline spinner for SESSION."
   (setq eca-chat--spinner-timer
         (run-with-timer
          0
          0.5
          (lambda ()
            (when eca-chat--spinner-timer
-             (with-current-buffer (eca-chat--get-buffer)
+             (with-current-buffer (eca-chat--get-buffer session)
                (if (eq 3 (length eca-chat--spinner-string))
                    (setq eca-chat--spinner-string ".")
                  (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
@@ -250,25 +252,25 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (setq eca-chat--spinner-timer nil))
   (setq eca-chat--spinner-string ""))
 
-(defun eca-chat--behavior ()
-  "The chat behavior considering what's in session and user option."
+(defun eca-chat--behavior (session)
+  "The chat behavior considering what's in SESSION and user option."
   (or eca-chat-custom-behavior
-      (eca--session-chat-default-behavior eca--session)))
+      (eca--session-chat-default-behavior session)))
 
-(defun eca-chat--model ()
-  "The chat model considering what's in session and user option."
+(defun eca-chat--model (session)
+  "The chat model considering what's in SESSION and user option."
   (or eca-chat-custom-model
-      (eca--session-chat-default-model eca--session)))
+      (eca--session-chat-default-model session)))
 
-(defun eca-chat--mcps-summary ()
-  "The summary of MCP servers."
+(defun eca-chat--mcps-summary (session)
+  "The summary of MCP servers for SESSION."
   (let* ((running 0) (starting 0) (failed 0)
          (propertize-fn (lambda (n face &optional add-slash?)
                           (unless (zerop n)
                             (concat
                              (propertize (number-to-string n) 'font-lock-face face)
                              (when add-slash? (propertize "/" 'font-lock-face 'font-lock-comment-face))))))
-         (mcp-servers (eca-mcp-servers)))
+         (mcp-servers (eca-mcp-servers session)))
     (if (seq-empty-p mcp-servers)
         "0"
       (progn
@@ -293,9 +295,9 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (overlay-put prompt-field-ov 'eca-chat-prompt-field t)
     (overlay-put prompt-field-ov 'before-string (propertize eca-chat-prompt-prefix 'font-lock-face 'eca-chat-prompt-prefix-face))))
 
-(defun eca-chat--clear ()
-  "Clear the chat."
-  (with-current-buffer (eca-chat--get-buffer)
+(defun eca-chat--clear (session)
+  "Clear the chat for SESSION."
+  (with-current-buffer (eca-chat--get-buffer session)
     (erase-buffer)
     (remove-overlays (point-min) (point-max))
     (insert "\n")
@@ -316,23 +318,24 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
                 'pointer 'hand
                 'keymap km)))
 
-(defun eca-chat--stop-prompt ()
-  "Stop the running chat prompt."
+(defun eca-chat--stop-prompt (session)
+  "Stop the running chat prompt for SESSION."
   (when eca-chat--chat-loading
-    (with-current-buffer (eca-chat--get-buffer)
-      (eca-api-notify :method "chat/promptStop"
+    (with-current-buffer (eca-chat--get-buffer session)
+      (eca-api-notify session
+                      :method "chat/promptStop"
                       :params (list :chatId eca-chat--id))
-      (eca-chat--set-chat-loading nil))))
+      (eca-chat--set-chat-loading session nil))))
 
-(defun eca-chat--set-chat-loading (loading)
-  "Set the chat to a loading state if LOADING is non nil.
+(defun eca-chat--set-chat-loading (session loading)
+  "Set the SESSION chat to a loading state if LOADING is non nil.
 Otherwise to a not loading state."
   (unless (eq eca-chat--chat-loading loading)
     (setq-local eca-chat--chat-loading loading)
     (let ((prompt-field-ov (eca-chat--prompt-field-ov))
           (stop-text (eca-chat--buttonize
                       (propertize "stop" 'font-lock-face 'eca-chat-prompt-stop-face)
-                      #'eca-chat--stop-prompt)))
+                      (lambda () (eca-chat--stop-prompt session)))))
       (if eca-chat--chat-loading
           (progn
             (overlay-put prompt-field-ov 'before-string (propertize eca-chat-prompt-prefix-loading 'font-lock-face 'default))
@@ -438,8 +441,9 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat--key-pressed-return ()
   "Send the current prompt to eca process if in prompt."
   (interactive)
-  (with-current-buffer (eca-chat--get-buffer)
+  (with-current-buffer (eca-chat--get-buffer (eca-session))
     (let* ((prompt-start (eca-chat--prompt-field-start-point))
+           (session (eca-session))
            (prompt (save-excursion
                      (goto-char prompt-start)
                      (string-trim (buffer-substring-no-properties (point) (point-max))))))
@@ -447,19 +451,20 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
        ;; check prompt
        ((and (not (string-empty-p prompt))
              (not eca-chat--chat-loading))
-        (when (seq-empty-p eca-chat--history) (eca-chat--clear))
+        (when (seq-empty-p eca-chat--history) (eca-chat--clear session))
         (add-to-list 'eca-chat--history prompt)
         (setq eca-chat--history-index -1)
         (goto-char prompt-start)
         (delete-region (point) (point-max))
-        (eca-chat--set-chat-loading t)
+        (eca-chat--set-chat-loading session t)
         (eca-api-request-async
+         session
          :method "chat/prompt"
          :params (list :message prompt
                        :request-id (cl-incf eca-chat--last-request-id)
                        :chatId eca-chat--id
-                       :model (eca-chat--model)
-                       :behavior (eca-chat--behavior)
+                       :model (eca-chat--model session)
+                       :behavior (eca-chat--behavior session)
                        :contexts (vconcat eca-chat--context))
          :success-callback (-lambda (res)
                              (setq-local eca-chat--id (plist-get res :chatId)))))
@@ -488,8 +493,8 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   (eq (line-number-at-pos (point))
       (line-number-at-pos (eca-chat--prompt-field-start-point))))
 
-(defun eca-chat--header-line-string ()
-  "Update chat header line."
+(defun eca-chat--header-line-string (session)
+  "Update chat header line for SESSION."
   (let ((model-keymap (make-sparse-keymap))
         (behavior-keymap (make-sparse-keymap))
         (mcp-keymap (make-sparse-keymap)))
@@ -500,7 +505,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                       'font-lock-face 'eca-chat-option-key-face
                       'pointer 'hand
                       'keymap model-keymap)
-          (propertize (eca-chat--model)
+          (propertize (eca-chat--model session)
                       'font-lock-face 'eca-chat-option-value-face
                       'pointer 'hand
                       'keymap model-keymap)
@@ -509,7 +514,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                       'font-lock-face 'eca-chat-option-key-face
                       'pointer 'hand
                       'keymap behavior-keymap)
-          (propertize (eca-chat--behavior)
+          (propertize (eca-chat--behavior session)
                       'font-lock-face 'eca-chat-option-value-face
                       'pointer 'hand
                       'keymap behavior-keymap)
@@ -518,7 +523,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                       'font-lock-face 'eca-chat-option-key-face
                       'pointer 'hand
                       'keymap mcp-keymap)
-          (propertize (eca-chat--mcps-summary)
+          (propertize (eca-chat--mcps-summary session)
                       'pointer 'hand
                       'keymap mcp-keymap))))
 
@@ -550,13 +555,13 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
      fill-space
      usage-str)))
 
-(defun eca-chat--get-buffer ()
-  "Get the eca chat buffer for current session."
-  (get-buffer eca-chat-buffer-name))
+(defun eca-chat--get-buffer (session)
+  "Get the eca chat buffer for SESSION."
+  (get-buffer (eca-chat-buffer-name session)))
 
-(defun eca-chat--create-buffer ()
-  "Create the eca chat buffer for current session."
-  (get-buffer-create (generate-new-buffer-name eca-chat-buffer-name)))
+(defun eca-chat--create-buffer (session)
+  "Create the eca chat buffer for SESSION."
+  (get-buffer-create (generate-new-buffer-name (eca-chat-buffer-name session))))
 
 (defun eca-chat--select-window ()
   "Select the Window."
@@ -781,6 +786,7 @@ If FORCE? decide to OPEN? or not."
   (hl-line-mode -1)
   (setq-local eca-chat--history '())
   (setq-local eca-chat--history-index -1)
+  (setq-local eca--session-cache (eca-session))
 
   (make-local-variable 'completion-at-point-functions)
   (setq-local completion-at-point-functions (list #'eca-chat-completion-at-point))
@@ -790,13 +796,13 @@ If FORCE? decide to OPEN? or not."
 
   (unless (listp header-line-format)
     (setq-local header-line-format (list header-line-format)))
-  (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line-string))))
+  (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line-string eca--session-cache))))
 
   (when (eq 0 (length (string-trim (buffer-string))))
     (save-excursion
       (goto-char (point-min))
       (insert "\n")
-      (insert (propertize (eca--session-chat-welcome-message eca--session)
+      (insert (propertize (eca--session-chat-welcome-message eca--session-cache)
                           'font-lock-face 'eca-chat-welcome-face))
       (eca-chat--insert-prompt-string)))
 
@@ -804,7 +810,7 @@ If FORCE? decide to OPEN? or not."
    0.05
    nil
    (lambda ()
-     (with-current-buffer (eca-chat--get-buffer)
+     (with-current-buffer (eca-chat--get-buffer eca--session-cache)
        (display-line-numbers-mode -1)
        (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
        (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
@@ -822,6 +828,7 @@ If FORCE? decide to OPEN? or not."
                       (cond
                        ((eca-chat--point-at-new-context-p)
                         (-let (((&plist :contexts contexts) (eca-api-request-sync
+                                                             (eca-session)
                                                              :method "chat/queryContext"
                                                              :params (list :chatId eca-chat--id
                                                                            :query (thing-at-point 'symbol t)
@@ -842,14 +849,14 @@ If FORCE? decide to OPEN? or not."
         (t
          (complete-with-action action (funcall candidates) probe pred))))
      :company-kind #'eca-chat--completion-candidate-kind
-     :annotation-function (-partial #'eca-chat--completion-annotate (eca--session-workspace-folders eca--session))
+     :annotation-function (-partial #'eca-chat--completion-annotate (eca--session-workspace-folders (eca-session)))
      :exit-function #'eca-chat--completion-exit-function)))
 
-(defun eca-chat-content-received (params)
-  "Handle the content received notification with PARAMS."
+(defun eca-chat-content-received (session params)
+  "Handle the content received notification with PARAMS for SESSION."
   (let* ((role (plist-get params :role))
          (content (plist-get params :content)))
-    (with-current-buffer (eca-chat--get-buffer)
+    (with-current-buffer (eca-chat--get-buffer session)
       (pcase (plist-get content :type)
         ("text" (when-let* ((text (plist-get content :text)))
                   (pcase role
@@ -916,12 +923,14 @@ If FORCE? decide to OPEN? or not."
                                      " "
                                      (eca-chat--buttonize
                                       (propertize "cancel" 'font-lock-face 'eca-chat-tool-call-cancel-face)
-                                      (lambda () (eca-api-notify :method "chat/toolCallReject"
+                                      (lambda () (eca-api-notify session
+                                                                 :method "chat/toolCallReject"
                                                                  :params (list :chatId eca-chat--id :toolCallId id))))
                                      " "
                                      (eca-chat--buttonize
                                       (propertize "run" 'font-lock-face 'eca-chat-tool-call-run-face)
-                                      (lambda () (eca-api-notify :method "chat/toolCallApprove"
+                                      (lambda () (eca-api-notify session
+                                                                 :method "chat/toolCallApprove"
                                                                  :params (list :chatId eca-chat--id :toolCallId id))))
                                      )))
                           (eca-chat--content-table `(("arguments" . ,args))))))
@@ -962,12 +971,12 @@ If FORCE? decide to OPEN? or not."
         ("progress" (pcase (plist-get content :state)
                       ("running" (progn
                                    (unless eca-chat--spinner-timer
-                                     (eca-chat--spinner-start))
+                                     (eca-chat--spinner-start session))
                                    (setq-local eca-chat--progress-text (propertize (plist-get content :text) 'font-lock-face 'eca-chat-system-messages-face))))
                       ("finished" (progn
                                     (eca-chat--spinner-stop)
                                     (eca-chat--add-text-content (propertize "\n" 'line-spacing 10))
-                                    (eca-chat--set-chat-loading nil)
+                                    (eca-chat--set-chat-loading session nil)
                                     (setq-local eca-chat--progress-text "")))))
         ("usage" (progn
                    (setq-local eca-chat--message-input-tokens (plist-get content :messageInputTokens))
@@ -976,56 +985,57 @@ If FORCE? decide to OPEN? or not."
                    (setq-local eca-chat--message-cost (plist-get content :messageCost))
                    (setq-local eca-chat--session-cost (plist-get content :sessionCost))))))))
 
-(defun eca-chat--handle-mcp-server-updated (_server)
-  "Handle mcp SERVER updated."
-  (force-mode-line-update))
+(defun eca-chat--handle-mcp-server-updated (session _server)
+  "Handle mcp SERVER updated for SESSION."
+  (with-current-buffer (eca-chat--get-buffer session)
+    (force-mode-line-update)))
 
-(defun eca-chat-open ()
-  "Open or create dedicated eca chat window."
-  (eca-assert-session-running)
-  (unless (buffer-live-p (eca-chat--get-buffer))
-    (eca-chat--create-buffer))
-  (with-current-buffer (eca-chat--get-buffer)
+(defun eca-chat-open (session)
+  "Open or create dedicated eca chat window for SESSION."
+  (eca-assert-session-running session)
+  (unless (buffer-live-p (eca-chat--get-buffer session))
+    (eca-chat--create-buffer session))
+  (with-current-buffer (eca-chat--get-buffer session)
     (unless (derived-mode-p 'eca-chat-mode)
       (eca-chat-mode)
       (eca-chat--add-context (list :type "repoMap")))
-    (unless (eca--session-chat eca--session)
-      (setf (eca--session-chat eca--session) (current-buffer)))
+    (unless (eca--session-chat session)
+      (setf (eca--session-chat session) (current-buffer)))
     (if (window-live-p (get-buffer-window (buffer-name)))
         (eca-chat--select-window)
       (eca-chat--pop-window))))
 
-(defun eca-chat-exit ()
-  "Exit the ECA chat."
-  (when (buffer-live-p (get-buffer eca-chat-buffer-name))
-    (with-current-buffer (eca-chat--get-buffer)
+(defun eca-chat-exit (session)
+  "Exit the ECA chat for SESSION."
+  (when (buffer-live-p (get-buffer (eca-chat-buffer-name session)))
+    (with-current-buffer (eca-chat--get-buffer session)
       (setq eca-chat--closed t)
       (force-mode-line-update)
       (goto-char (point-max))
       (rename-buffer (concat (buffer-name) ":closed") t)
-      (when-let* ((window (get-buffer-window (eca-chat--get-buffer))))
+      (when-let* ((window (get-buffer-window (eca-chat--get-buffer session))))
         (quit-window nil window)))))
 
 ;;;###autoload
 (defun eca-chat-clear ()
   "Clear the eca chat."
   (interactive)
-  (eca-chat--clear))
+  (eca-chat--clear (eca-session)))
 
 ;;;###autoload
 (defun eca-chat-select-model ()
   "Select which model to use in the chat from what server supports."
   (interactive)
-  (eca-assert-session-running)
-  (when-let* ((model (completing-read "Select a model:" (append (eca--session-models eca--session) nil) nil t)))
+  (eca-assert-session-running (eca-session))
+  (when-let* ((model (completing-read "Select a model:" (append (eca--session-models (eca-session)) nil) nil t)))
     (setq eca-chat-custom-model model)))
 
 ;;;###autoload
 (defun eca-chat-select-behavior ()
   "Select which chat behavior to use from what server supports."
   (interactive)
-  (eca-assert-session-running)
-  (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors eca--session) nil) nil t)))
+  (eca-assert-session-running (eca-session))
+  (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors (eca-session)) nil) nil t)))
     (setq eca-chat-custom-behavior behavior)))
 
 ;;;###autoload
@@ -1033,14 +1043,15 @@ If FORCE? decide to OPEN? or not."
   "Request a chat reset."
   (interactive)
   (when eca-chat--id
-    (eca-api-request-sync :method "chat/delete"
+    (eca-api-request-sync (eca-session)
+                          :method "chat/delete"
                           :params (list :chatId eca-chat--id))
     (setq-local eca-chat--message-input-tokens nil)
     (setq-local eca-chat--message-output-tokens nil)
     (setq-local eca-chat--session-tokens nil)
     (setq-local eca-chat--message-cost nil)
     (setq-local eca-chat--session-cost nil)
-    (eca-chat--clear)))
+    (eca-chat--clear (eca-session))))
 
 (declare-function whisper-run "ext:whisper" ())
 
@@ -1050,29 +1061,30 @@ If FORCE? decide to OPEN? or not."
   (interactive)
   (unless (require 'whisper nil t)
     (user-error "Whisper.el is not available, please install it first"))
-  (eca-assert-session-running)
-  (eca-chat-open)
-  (with-current-buffer (eca-chat--get-buffer)
-    (goto-char (point-max)))
-  (let ((buffer (get-buffer-create "*whisper-stdout*")))
-    (with-current-buffer buffer
-      (erase-buffer)
-      (make-local-variable 'whisper-after-transcription-hook)
-      (add-hook 'whisper-after-transcription-hook
-                (lambda ()
-                  (let ((transcription (buffer-substring
-                                        (line-beginning-position)
-                                        (line-end-position))))
-                    (with-current-buffer eca-chat-buffer-name
-                      (insert transcription)
-                      (newline)
-                      (eca-chat--key-pressed-return))))
-                nil t)
-      (whisper-run)
-      (eca-info "Recording audio. Press RET when you are done.")
-      (while (not (equal ?\r (read-char)))
-        (sit-for 0.5))
-      (whisper-run))))
+  (let ((session (eca-session)))
+    (eca-assert-session-running session)
+    (eca-chat-open session)
+    (with-current-buffer (eca-chat--get-buffer session)
+      (goto-char (point-max)))
+    (let ((buffer (get-buffer-create "*whisper-stdout*")))
+      (with-current-buffer buffer
+        (erase-buffer)
+        (make-local-variable 'whisper-after-transcription-hook)
+        (add-hook 'whisper-after-transcription-hook
+                  (lambda ()
+                    (let ((transcription (buffer-substring
+                                          (line-beginning-position)
+                                          (line-end-position))))
+                      (with-current-buffer (eca-chat-buffer-name session)
+                        (insert transcription)
+                        (newline)
+                        (eca-chat--key-pressed-return))))
+                  nil t)
+        (whisper-run)
+        (eca-info "Recording audio. Press RET when you are done.")
+        (while (not (equal ?\r (read-char)))
+          (sit-for 0.5))
+        (whisper-run)))))
 
 (provide 'eca-chat)
 ;;; eca-chat.el ends here

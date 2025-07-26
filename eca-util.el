@@ -40,9 +40,15 @@
                default-directory)
     (file-truename)))
 
-(defvar eca--session nil)
+(defvar eca--sessions '())
+(defvar session-ids 0)
+;; Var to hold the current session, useful for buffers like chat
+(defvar-local eca--session-cache nil)
 
 (cl-defstruct eca--session
+  ;; id to manage multiple eca sessions
+  (id nil)
+
   ;; The status of this session
   (status 'stopped)
 
@@ -81,15 +87,34 @@
   ;; The welcome message for new chats.
   (chat-welcome-message ""))
 
+(defun eca-session ()
+  "Return the session related to root of current buffer otherwise nil."
+  (or eca--session-cache
+      (let ((root (eca--project-root)))
+        (-first (lambda (session)
+                  (-first (lambda (folder) (string= folder root))
+                          (eca--session-workspace-folders session)))
+                (eca-vals eca--sessions)))))
+
 (defun eca-create-session ()
   "Create a new ECA session."
-  (let ((session (make-eca--session)))
+  (let ((session (make-eca--session))
+        (id (cl-incf session-ids)))
+    (setf (eca--session-id session) id)
     (setf (eca--session-workspace-folders session) (list (eca--project-root)))
+    (setq eca--sessions (eca-assoc eca--sessions id session))
     session))
 
-(defun eca-assert-session-running ()
-  "Assert that a eca session is running."
-  (unless eca--session
+(defun eca-delete-session (session)
+  "Delete SESSION from existing sessions."
+  (when session
+    (setq eca--session-cache nil)
+    (setq eca--sessions
+          (eca-dissoc eca--sessions (eca--session-id session)))))
+
+(defun eca-assert-session-running (session)
+  "Assert that a eca SESSION is running."
+  (unless session
     (user-error "ECA must be running, start with `eca` command")))
 
 (defun eca--path-to-uri (path)

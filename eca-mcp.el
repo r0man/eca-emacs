@@ -35,27 +35,29 @@
 
 ;; Internal
 
-(defvar eca-mcp-details-buffer-name "<eca-mcp-details>")
+(defun eca-mcp-details-buffer-name (session)
+  "Return the chat buffer name for SESSION."
+  (format  "<eca-mcp-details:%s>" (eca--session-id session)))
 
-(defun eca-mcp--get-details-buffer ()
-  "Get the eca mcp buffer for current session."
-  (get-buffer eca-mcp-details-buffer-name))
+(defun eca-mcp--get-details-buffer (session)
+  "Get the eca mcp buffer for SESSION."
+  (get-buffer (eca-mcp-details-buffer-name session)))
 
-(defun eca-mcp--create-details-buffer ()
-  "Create the eca mcp details buffer for current session."
-  (get-buffer-create (generate-new-buffer-name eca-mcp-details-buffer-name)))
+(defun eca-mcp--create-details-buffer (session)
+  "Create the eca mcp details buffer for SESSION."
+  (get-buffer-create (generate-new-buffer-name (eca-mcp-details-buffer-name session))))
 
-(defun eca-mcp--refresh-server-details ()
-  "Refresh the MCP server details."
-  (when (buffer-live-p (get-buffer eca-mcp-details-buffer-name))
-    (with-current-buffer (eca-mcp--get-details-buffer)
+(defun eca-mcp--refresh-server-details (session)
+  "Refresh the MCP server details for SESSION."
+  (when (buffer-live-p (get-buffer (eca-mcp-details-buffer-name session)))
+    (with-current-buffer (eca-mcp--get-details-buffer session)
       (erase-buffer)
       (insert (propertize "MCP servers" 'font-lock-face 'helpful-heading))
       (insert "\n\n")
       (seq-doseq (server (-sort  (lambda (a b)
                                    (string-lessp (plist-get a :name)
                                                  (plist-get b :name)))
-                                 (eca-vals (eca--session-tool-servers eca--session))))
+                                 (eca-vals (eca--session-tool-servers session))))
         (-let (((&plist :name name :command command :args args
                         :status status :tools tools) server))
           (insert (propertize name 'font-lock-face 'bold))
@@ -76,7 +78,7 @@
                 (insert (propertize (plist-get tool :name)
                                     'font-lock-face (if (plist-get tool :disabled)
                                                         'eca-mcp-details-tool-disabled-face
-                                                        'eca-mcp-details-tool-face)) " "))))
+                                                      'eca-mcp-details-tool-face)) " "))))
           (when command
             (insert "\n")
             (insert (propertize "Command: " 'font-lock-face font-lock-doc-face))
@@ -86,7 +88,7 @@
             (insert (propertize (format "Failed to start, check %s for details"
                                         (buttonize
                                          "eca stderr buffer"
-                                         (lambda(_) (eca-process-show-stderr))))
+                                         (lambda(_) (eca-process-show-stderr session))))
                                 'font-lock-face 'error))))
         (insert "\n\n")))))
 
@@ -96,41 +98,42 @@
   "Major mode for ECA mcp details."
   :group 'eca
   (visual-line-mode)
-  (eca-mcp--refresh-server-details))
+  (eca-mcp--refresh-server-details (eca-session)))
 
-(defun eca-mcp-servers ()
-  "Return all servers that are not from eca server, the MCP servers."
-  (eca-vals (eca-dissoc (eca--session-tool-servers eca--session) "ECA")))
+(defun eca-mcp-servers (session)
+  "Return all servers that are not from eca server SESSION, the MCP servers."
+  (eca-vals (eca-dissoc (eca--session-tool-servers session) "ECA")))
 
-(defun eca-mcp--handle-mcp-server-updated (_server)
-  "Handle mcp SERVER updated."
-  (eca-mcp--refresh-server-details))
+(defun eca-mcp--handle-mcp-server-updated (session _server)
+  "Handle mcp SERVER updated for SESSION."
+  (eca-mcp--refresh-server-details session))
 
-(defun eca-mcp-details-exit ()
-  "Exit the ECA mcp details."
-  (when (buffer-live-p (get-buffer eca-mcp-details-buffer-name))
-    (with-current-buffer (eca-mcp--get-details-buffer)
+(defun eca-mcp-details-exit (session)
+  "Exit the ECA mcp details for SESSION."
+  (when (buffer-live-p (get-buffer (eca-mcp-details-buffer-name session)))
+    (with-current-buffer (eca-mcp--get-details-buffer session)
       (goto-char (point-max))
       (setq-local mode-line-format '("*Closed session*"))
       (rename-buffer (concat (buffer-name) ":closed") t)
-      (when-let* ((window (get-buffer-window (eca-mcp--get-details-buffer))))
+      (when-let* ((window (get-buffer-window (eca-mcp--get-details-buffer session))))
         (quit-window nil window)))))
 
 ;;;###autoload
 (defun eca-mcp-details ()
   "List MCP servers with their status and options."
   (interactive)
-  (eca-assert-session-running)
-  (unless (buffer-live-p (eca-mcp--get-details-buffer))
-    (eca-mcp--create-details-buffer))
-  (with-current-buffer (eca-mcp--get-details-buffer)
-    (unless (derived-mode-p 'eca-mcp-details-mode)
-      (eca-mcp-details-mode))
-    (if (window-live-p (get-buffer-window (buffer-name)))
-        (select-window (get-buffer-window (buffer-name)))
-      (display-buffer (current-buffer) eca-mcp-details-position-params)
-      (select-window (get-buffer-window (current-buffer)))
-      (set-window-buffer (get-buffer-window (current-buffer)) (current-buffer)))))
+  (let ((session (eca-session)))
+    (eca-assert-session-running session)
+    (unless (buffer-live-p (eca-mcp--get-details-buffer session))
+      (eca-mcp--create-details-buffer session))
+    (with-current-buffer (eca-mcp--get-details-buffer session)
+      (unless (derived-mode-p 'eca-mcp-details-mode)
+        (eca-mcp-details-mode))
+      (if (window-live-p (get-buffer-window (buffer-name)))
+          (select-window (get-buffer-window (buffer-name)))
+        (display-buffer (current-buffer) eca-mcp-details-position-params)
+        (select-window (get-buffer-window (current-buffer)))
+        (set-window-buffer (get-buffer-window (current-buffer)) (current-buffer))))))
 
 (provide 'eca-mcp)
 ;;; eca-mcp.el ends here

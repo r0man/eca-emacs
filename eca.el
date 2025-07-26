@@ -64,51 +64,52 @@
       ("warning" (eca-warn msg))
       ("info" (eca-info msg)))))
 
-(defun eca--tool-server-updated (server)
-  "Handle tool server updated message with SERVER."
-  (setf (eca--session-tool-servers eca--session)
-        (eca-assoc (eca--session-tool-servers eca--session)
+(defun eca--tool-server-updated (session server)
+  "Handle tool server updated message with SERVER for SESSION."
+  (setf (eca--session-tool-servers session)
+        (eca-assoc (eca--session-tool-servers session)
                    (plist-get server :name)
                    server))
-  (eca-chat--handle-mcp-server-updated server)
-  (eca-mcp--handle-mcp-server-updated server))
+  (eca-chat--handle-mcp-server-updated session server)
+  (eca-mcp--handle-mcp-server-updated session server))
 
-(defun eca--handle-server-notification (notification)
-  "Handle NOTIFICATION sent by server."
+(defun eca--handle-server-notification (session notification)
+  "Handle NOTIFICATION sent by server for SESSION."
   (let ((method (plist-get notification :method))
         (params (plist-get notification :params)))
     (pcase method
-      ("chat/contentReceived" (eca-chat-content-received params))
-      ("tool/serverUpdated" (eca--tool-server-updated params))
+      ("chat/contentReceived" (eca-chat-content-received session params))
+      ("tool/serverUpdated" (eca--tool-server-updated session params))
       ("$/showMessage" (eca--handle-show-message params))
       (_ (eca-warn "Unknown notification %s" method)))))
 
-(defun eca--handle-server-request (_request)
-  "Handle REQUEST sent by server."
+(defun eca--handle-server-request (_session _request)
+  "Handle REQUEST sent by server for SESSION."
   ;; TODO
   )
 
-(defun eca--handle-message (json-data)
-  "Handle raw message JSON-DATA."
+(defun eca--handle-message (session json-data)
+  "Handle raw message JSON-DATA for SESSION."
   (let ((id (plist-get json-data :id))
         (result (plist-get json-data :result)))
     (pcase (eca--get-message-type json-data)
-      ('response (-let [(success-callback) (plist-get (eca--session-response-handlers eca--session) id)]
+      ('response (-let [(success-callback) (plist-get (eca--session-response-handlers session) id)]
                    (when success-callback
-                     (cl-remf (eca--session-response-handlers eca--session) id)
+                     (cl-remf (eca--session-response-handlers session) id)
                      (funcall success-callback result))))
-      ('response-error (-let [(_ error-callback) (plist-get (eca--session-response-handlers eca--session) id)]
+      ('response-error (-let [(_ error-callback) (plist-get (eca--session-response-handlers session) id)]
                          (when error-callback
-                           (cl-remf (eca--session-response-handlers eca--session) id)
+                           (cl-remf (eca--session-response-handlers session) id)
                            (funcall error-callback (plist-get json-data :error)))))
-      ('notification (eca--handle-server-notification json-data))
-      ('request (eca--handle-server-request json-data)))))
+      ('notification (eca--handle-server-notification session json-data))
+      ('request (eca--handle-server-request session json-data)))))
 
-(defun eca--initialize ()
-  "Sent the initialize request."
+(defun eca--initialize (session)
+  "Send the initialize request for SESSION."
   (run-hooks 'eca-before-initialize-hook)
-  (setf (eca--session-status eca--session) 'starting)
+  (setf (eca--session-status session) 'starting)
   (eca-api-request-async
+   session
    :method "initialize"
    :params (list :processId (emacs-pid)
                  :clientInfo (list :name "emacs"
@@ -118,21 +119,21 @@
                  :workspaceFolders (vconcat (-map (lambda (folder)
                                                     (list :uri (eca--path-to-uri folder)
                                                           :name (file-name-nondirectory (directory-file-name folder))))
-                                                  (eca--session-workspace-folders eca--session))))
+                                                  (eca--session-workspace-folders session))))
    :success-callback (-lambda ((&plist :chatWelcomeMessage msg
                                        :chatBehaviors chat-behaviors
                                        :chatDefaultBehavior chat-default-behavior
                                        :chatDefaultModel chat-default-model
                                        :models models))
-                       (setf (eca--session-status eca--session) 'started)
-                       (setf (eca--session-chat-welcome-message eca--session) msg)
-                       (setf (eca--session-models eca--session) models)
-                       (setf (eca--session-chat-behaviors eca--session) chat-behaviors)
-                       (setf (eca--session-chat-default-model eca--session) chat-default-model)
-                       (setf (eca--session-chat-default-behavior eca--session) chat-default-behavior)
-                       (eca-api-notify :method "initialized")
+                       (setf (eca--session-status session) 'started)
+                       (setf (eca--session-chat-welcome-message session) msg)
+                       (setf (eca--session-models session) models)
+                       (setf (eca--session-chat-behaviors session) chat-behaviors)
+                       (setf (eca--session-chat-default-model session) chat-default-model)
+                       (setf (eca--session-chat-default-behavior session) chat-default-behavior)
+                       (eca-api-notify session :method "initialized")
                        (eca-info "Started!")
-                       (eca-chat-open)
+                       (eca-chat-open session)
                        (run-hooks 'eca-after-initialize-hook))
    :error-callback (lambda (e) (eca-error e))))
 
@@ -140,34 +141,36 @@
 (defun eca ()
   "Start or switch to a eca session."
   (interactive)
-  (unless eca--session
-    (setq eca--session (eca-create-session)))
-  (pcase (eca--session-status eca--session)
-    ('stopped (eca-process-start (lambda ()
-                                    (eca--initialize))
-                                 #'eca--handle-message))
-    ('started (eca-chat-open))
-    ('starting (eca-info "eca server is already starting"))))
+  (let ((session (or (eca-session)
+                     (eca-create-session))))
+    (pcase (eca--session-status session)
+      ('stopped (eca-process-start session
+                                   (lambda ()
+                                     (eca--initialize session))
+                                   (-partial #'eca--handle-message session)))
+      ('started (eca-chat-open session))
+      ('starting (eca-info "eca server is already starting")))))
 
 ;;;###autoload
 (defun eca-stop ()
   "Stop eca if running."
   (interactive)
-  (when (eca-process-running-p)
-    (eca-info "Shutting down...")
-    (eca-api-request-sync :method "shutdown")
-    (eca-api-notify :method "exit")
-    (eca-process-stop))
-  (eca-chat-exit)
-  (eca-mcp-details-exit)
-  (setq eca--session nil))
+  (let ((session (eca-session)))
+    (when (eca-process-running-p session)
+      (eca-info "Shutting down...")
+      (eca-api-request-sync session :method "shutdown")
+      (eca-api-notify session :method "exit")
+      (eca-process-stop session)
+      (eca-chat-exit session)
+      (eca-mcp-details-exit session)
+      (eca-delete-session session))))
 
 ;;;###autoload
 (defun eca-workspaces ()
   "Return workspaces used by current session."
   (interactive)
-  (when eca--session
-    (eca-info "Workspaces: %s" (eca--session-workspace-folders eca--session))))
+  (when (eca-session)
+    (eca-info "Workspaces: %s" (eca--session-workspace-folders (eca-session)))))
 
 (provide 'eca)
 ;;; eca.el ends here
