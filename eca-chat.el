@@ -154,7 +154,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :group 'eca)
 
 (defface eca-chat-mcp-tool-call-label-face
-  '((t :inherit font-lock-keyword-face :underline t))
+  '((t :inherit font-lock-function-call-face :underline t))
   "Face for the MCP tool calls in chat."
   :group 'eca)
 
@@ -616,6 +616,10 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
         (overlay-put ov-label 'eca-chat--expandable-content-id id)
         (overlay-put ov-label 'eca-chat--expandable-content-toggle nil)
         (insert (propertize label
+                            'keymap (let ((km (make-sparse-keymap)))
+                                      (define-key km (kbd "<mouse-1>") (lambda () (eca-chat--expandable-content-toggle id)))
+                                      (define-key km (kbd "<tab>") (lambda () (eca-chat--expandable-content-toggle id)))
+                                      km)
                             'line-prefix eca-chat-expandable-block-open-symbol
                             'help-echo "mouse-1 / tab / RET: expand/collapse"))
         (insert "\n")
@@ -883,6 +887,7 @@ If FORCE? decide to OPEN? or not."
         ("toolCallPrepare" (let* ((name (plist-get content :name))
                                   (origin (plist-get content :origin))
                                   (argsText (plist-get content :argumentsText))
+                                  (colorizedArgsText (concat "```javascript\n" argsText "\n```"))
                                   (id (plist-get content :id))
                                   (label (concat (propertize (format "Preparing %s tool call: "
                                                                      (if (string= "mcp" origin) "MCP" "ECA"))
@@ -891,8 +896,8 @@ If FORCE? decide to OPEN? or not."
                                                  " "
                                                  eca-chat-mcp-tool-call-loading-symbol)))
                              (if (eca-chat--get-expandable-content id)
-                                 (eca-chat--rename-expandable-content id label argsText t)
-                               (eca-chat--add-expandable-content id label (eca-chat--content-table `(("arguments" . ,argsText)))))))
+                                 (eca-chat--rename-expandable-content id label colorizedArgsText)
+                               (eca-chat--add-expandable-content id label (eca-chat--content-table `(("arguments" . ,colorizedArgsText)))))))
         ("toolCallRun" (let* ((name (plist-get content :name))
                               (origin (plist-get content :origin))
                               (args (plist-get content :arguments))
