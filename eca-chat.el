@@ -675,7 +675,7 @@ If FORCE? decide to OPEN? or not."
             (put-text-property (point) (line-end-position)
                                'line-prefix eca-chat-expandable-block-close-symbol)
             (goto-char (overlay-start ov-content))
-            (insert content)
+            (insert content "\n")
             (overlay-put ov-label 'eca-chat--expandable-content-toggle t))))
       open?)))
 
