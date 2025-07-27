@@ -931,8 +931,7 @@ If FORCE? decide to OPEN? or not."
                                       (propertize "run" 'font-lock-face 'eca-chat-tool-call-run-face)
                                       (lambda () (eca-api-notify session
                                                                  :method "chat/toolCallApprove"
-                                                                 :params (list :chatId eca-chat--id :toolCallId id))))
-                                     )))
+                                                                 :params (list :chatId eca-chat--id :toolCallId id)))))))
                           (eca-chat--content-table `(("arguments" . ,args))))))
         ("toolCallRejected" (let* ((name (plist-get content :name))
                                    (origin (plist-get content :origin))

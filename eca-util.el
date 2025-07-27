@@ -41,7 +41,7 @@
     (file-truename)))
 
 (defvar eca--sessions '())
-(defvar session-ids 0)
+(defvar eca--session-ids 0)
 
 (cl-defstruct eca--session
   ;; id to manage multiple eca sessions
@@ -96,7 +96,7 @@
 (defun eca-create-session ()
   "Create a new ECA session."
   (let ((session (make-eca--session))
-        (id (cl-incf session-ids)))
+        (id (cl-incf eca--session-ids)))
     (setf (eca--session-id session) id)
     (setf (eca--session-workspace-folders session) (list (eca--project-root)))
     (setq eca--sessions (eca-assoc eca--sessions id session))
