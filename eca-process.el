@@ -274,7 +274,7 @@ Call HANDLE-MSG for new msgs processed."
   (unless (process-live-p (eca--session-process session))
     (-let* (((result &as &plist :decision decision :command command) (eca-process--server-command))
             (start-process-fn (lambda ()
-                                (eca-info "Starting process..." (string-join command " "))
+                                (eca-info "Starting process '%s'" (string-join command " "))
                                 (setf (eca--session-process session)
                                       (make-process
                                        :coding 'no-conversion

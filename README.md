@@ -65,6 +65,10 @@ accuracy and transcription speed.
   (whisper-model "small"))
 ```
 
+### Custom workspaces
+
+Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the process.
+
 ## Optional interesting settings
 
 - `eca-chat-usage-string-format`: to customize what shows on mode-line for usage like costs and tokens.

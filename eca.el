@@ -132,17 +132,38 @@
                        (setf (eca--session-chat-default-model session) chat-default-model)
                        (setf (eca--session-chat-default-behavior session) chat-default-behavior)
                        (eca-api-notify session :method "initialized")
-                       (eca-info "Started!")
+                       (eca-info "Started with workspaces: %s" (string-join (eca--session-workspace-folders session) ","))
                        (eca-chat-open session)
                        (run-hooks 'eca-after-initialize-hook))
    :error-callback (lambda (e) (eca-error e))))
 
+(defun eca--discover-workspaces ()
+  "Ask user for workspaces."
+  (let ((root (eca-find-root-for-buffer))
+        (add-workspace? "yes")
+        (workspaces '()))
+    (while (string= "yes" add-workspace?)
+      (let ((new-workspace (read-directory-name "Select the workspace root:" root)))
+        (push new-workspace workspaces)
+        (setq add-workspace? (completing-read "Add more workspaces?"
+                                              (lambda (string pred action)
+                                                (if (eq action 'metadata)
+                                                    `(metadata (display-sort-function . identity))
+                                                  (complete-with-action action '("no" "yes") string pred)))))))
+    workspaces))
+
+;; Public
+
 ;;;###autoload
-(defun eca ()
-  "Start or switch to a eca session."
-  (interactive)
-  (let ((session (or (eca-session)
-                     (eca-create-session))))
+(defun eca (&optional arg)
+  "Start or switch to a eca session.
+When ARG is current prefix, ask for workspace roots to use."
+  (interactive "P")
+  (let* ((workspaces (if (equal arg '(4))
+                         (eca--discover-workspaces)
+                       (list (eca-find-root-for-buffer))))
+         (session (or (eca-session)
+                      (eca-create-session workspaces))))
     (pcase (eca--session-status session)
       ('stopped (eca-process-start session
                                    (lambda ()
@@ -169,8 +190,8 @@
 (defun eca-workspaces ()
   "Return workspaces used by current session."
   (interactive)
-  (when (eca-session)
-    (eca-info "Workspaces: %s" (eca--session-workspace-folders (eca-session)))))
+  (eca-assert-session-running (eca-session))
+  (eca-info "Workspaces: %s" (eca--session-workspace-folders (eca-session))))
 
 (provide 'eca)
 ;;; eca.el ends here

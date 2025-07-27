@@ -33,7 +33,7 @@
   "Return the plist values from MAP."
   (-map #'cdr map))
 
-(defun eca--project-root ()
+(defun eca-find-root-for-buffer ()
   "Get the project root using git falling back to file directory."
   (-some-> (or (vc-git-root default-directory)
                (when buffer-file-name (file-name-directory buffer-file-name))
@@ -87,18 +87,18 @@
 
 (defun eca-session ()
   "Return the session related to root of current buffer otherwise nil."
-  (let ((root (eca--project-root)))
+  (let ((root (eca-find-root-for-buffer)))
     (-first (lambda (session)
               (-first (lambda (folder) (string= folder root))
                       (eca--session-workspace-folders session)))
             (eca-vals eca--sessions))))
 
-(defun eca-create-session ()
-  "Create a new ECA session."
+(defun eca-create-session (workspace-roots)
+  "Create a new ECA session for WORKSPACE-ROOTS."
   (let ((session (make-eca--session))
         (id (cl-incf eca--session-ids)))
     (setf (eca--session-id session) id)
-    (setf (eca--session-workspace-folders session) (list (eca--project-root)))
+    (setf (eca--session-workspace-folders session) workspace-roots)
     (setq eca--sessions (eca-assoc eca--sessions id session))
     session))
 
@@ -111,7 +111,7 @@
 (defun eca-assert-session-running (session)
   "Assert that a eca SESSION is running."
   (unless session
-    (user-error "ECA must be running, start with `eca` command")))
+    (user-error "ECA must be running, no session found, start with `eca` command")))
 
 (defun eca--path-to-uri (path)
   "Convert a PATH to a uri."
