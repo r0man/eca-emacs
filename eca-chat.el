@@ -786,7 +786,6 @@ If FORCE? decide to OPEN? or not."
   (hl-line-mode -1)
   (setq-local eca-chat--history '())
   (setq-local eca-chat--history-index -1)
-  (setq-local eca--session-cache (eca-session))
 
   (make-local-variable 'completion-at-point-functions)
   (setq-local completion-at-point-functions (list #'eca-chat-completion-at-point))
@@ -794,27 +793,28 @@ If FORCE? decide to OPEN? or not."
     (company-mode 1)
     (setq-local company-backends '(company-capf)))
 
-  (unless (listp header-line-format)
-    (setq-local header-line-format (list header-line-format)))
-  (add-to-list 'header-line-format '(t (:eval (eca-chat--header-line-string eca--session-cache))))
+  (let ((session (eca-session)))
+    (unless (listp header-line-format)
+      (setq-local header-line-format (list header-line-format)))
+    (add-to-list 'header-line-format `(t (:eval (eca-chat--header-line-string (eca-session)))))
 
-  (when (eq 0 (length (string-trim (buffer-string))))
-    (save-excursion
-      (goto-char (point-min))
-      (insert "\n")
-      (insert (propertize (eca--session-chat-welcome-message eca--session-cache)
-                          'font-lock-face 'eca-chat-welcome-face))
-      (eca-chat--insert-prompt-string)))
+    (when (eq 0 (length (string-trim (buffer-string))))
+      (save-excursion
+        (goto-char (point-min))
+        (insert "\n")
+        (insert (propertize (eca--session-chat-welcome-message session)
+                            'font-lock-face 'eca-chat-welcome-face))
+        (eca-chat--insert-prompt-string)))
 
-  (run-with-timer
-   0.05
-   nil
-   (lambda ()
-     (with-current-buffer (eca-chat--get-buffer eca--session-cache)
-       (display-line-numbers-mode -1)
-       (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
-       (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
-       (force-mode-line-update))))
+    (run-with-timer
+     0.05
+     nil
+     (lambda ()
+       (with-current-buffer (eca-chat--get-buffer session)
+         (display-line-numbers-mode -1)
+         (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
+         (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
+         (force-mode-line-update)))))
 
   (face-remap-add-relative 'markdown-line-break-face
                            '(:underline nil))

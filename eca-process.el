@@ -199,11 +199,8 @@ If not provided, download and start eca automatically."
                  nil (format "Invalid Content-Length value: %s" val)))
     (cons key val)))
 
-(defun eca-process--filter (handle-msg session _proc raw-output)
-  "Process filter to parse eca's stdout RAW-OUTPUT delivering to HANDLE-MSG.
-Set cache for SESSION."
-  (unless eca--session-cache
-    (setq eca--session-cache session))
+(defun eca-process--filter (handle-msg _proc raw-output)
+  "Process filter to parse eca's stdout RAW-OUTPUT delivering to HANDLE-MSG."
   (let ((body-received 0)
         leftovers body-length body chunk)
     (setf chunk (if (s-blank? leftovers)
@@ -286,7 +283,7 @@ Call HANDLE-MSG for new msgs processed."
                                        :command command
                                        :buffer (eca-process--buffer-name session)
                                        :stderr (get-buffer-create (eca-process--stderr-buffer-name session))
-                                       :filter (-partial #'eca-process--filter handle-msg session)
+                                       :filter (-partial #'eca-process--filter handle-msg)
                                        :sentinel (lambda (process exit-str)
                                                    (unless (process-live-p process)
                                                      (eca-delete-session session)

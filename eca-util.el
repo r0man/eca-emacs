@@ -42,8 +42,6 @@
 
 (defvar eca--sessions '())
 (defvar session-ids 0)
-;; Var to hold the current session, useful for buffers like chat
-(defvar-local eca--session-cache nil)
 
 (cl-defstruct eca--session
   ;; id to manage multiple eca sessions
@@ -89,12 +87,11 @@
 
 (defun eca-session ()
   "Return the session related to root of current buffer otherwise nil."
-  (or eca--session-cache
-      (let ((root (eca--project-root)))
-        (-first (lambda (session)
-                  (-first (lambda (folder) (string= folder root))
-                          (eca--session-workspace-folders session)))
-                (eca-vals eca--sessions)))))
+  (let ((root (eca--project-root)))
+    (-first (lambda (session)
+              (-first (lambda (folder) (string= folder root))
+                      (eca--session-workspace-folders session)))
+            (eca-vals eca--sessions))))
 
 (defun eca-create-session ()
   "Create a new ECA session."
@@ -108,7 +105,6 @@
 (defun eca-delete-session (session)
   "Delete SESSION from existing sessions."
   (when session
-    (setq eca--session-cache nil)
     (setq eca--sessions
           (eca-dissoc eca--sessions (eca--session-id session)))))
 
