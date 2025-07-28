@@ -214,7 +214,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defun eca-chat-buffer-name (session)
   "Return the chat buffer name for SESSION."
-  (format  "<eca-chat:%s>" (eca--session-id session)))
+  (format "<eca-chat:%s>" (eca--session-id session)))
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
@@ -234,12 +234,12 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defun eca-chat--spinner-start (session)
   "Start modeline spinner for SESSION."
   (setq eca-chat--spinner-timer
-        (run-with-timer
-         0
-         0.5
-         (lambda ()
-           (when eca-chat--spinner-timer
-             (with-current-buffer (eca-chat--get-buffer session)
+        (with-current-buffer (eca-chat--get-buffer session)
+          (run-with-timer
+           0
+           0.5
+           (lambda ()
+             (when eca-chat--spinner-timer
                (if (eq 3 (length eca-chat--spinner-string))
                    (setq eca-chat--spinner-string ".")
                  (setq eca-chat--spinner-string (concat eca-chat--spinner-string ".")))
@@ -810,7 +810,7 @@ If FORCE? decide to OPEN? or not."
      0.05
      nil
      (lambda ()
-       (with-current-buffer (eca-chat--get-buffer session)
+       (with-current-buffer (eca-chat--get-buffer (eca-session))
          (display-line-numbers-mode -1)
          (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
          (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
