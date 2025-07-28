@@ -150,11 +150,13 @@ If not provided, download and start eca automatically."
              (mkdir (f-parent download-path) t)
              (eca-info "Downloading eca server from %s to %s..."  url download-path)
              (url-copy-file url download-path)
+             (eca-info "Downloaded eca, unzipping it...")
              (unless eca-unzip-script
                (error "Unable to find `unzip' or `powershell' on the path, please customize `eca-unzip-script'"))
              (shell-command (format (funcall eca-unzip-script) download-path (f-parent store-path)))
              (f-write-text version 'utf-8 eca-server-version-file-path)
-             (eca-info "Downloaded eca successfully")
+             (set-file-modes store-path #o0700)
+             (eca-info "Installed eca successfully!")
              (funcall on-downloaded))
          (error "Could not download eca server" err))))))
 
