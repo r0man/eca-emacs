@@ -36,7 +36,7 @@ be used when `eca-chat-use-side-window' is non-nil."
                  (const :tag "Bottom" bottom))
   :group 'eca)
 
-(defcustom eca-chat-window-width 90
+(defcustom eca-chat-window-width 0.40
   "Width of the ECA chat side window when opened on left or right."
   :type 'integer
   :group 'eca)
