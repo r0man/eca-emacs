@@ -1065,8 +1065,8 @@ If FORCE? decide to OPEN? or not."
     (eca-chat--clear (eca-session))))
 
 ;;;###autoload
-(defun eca-chat-add-context ()
-  "Add file content with range to chat as context.
+(defun eca-chat-add-context-at-point ()
+  "Add file content with range at point to chat as context.
 Consider the defun at point unless a region is selected."
   (interactive)
   (eca-assert-session-running (eca-session))
@@ -1079,6 +1079,20 @@ Consider the defun at point unless a region is selected."
       (eca-chat--add-context (list :type "file"
                                    :path path
                                    :linesRange (list :start start :end end))))))
+
+;;;###autoload
+(defun eca-chat-add-file-context (&optional arg)
+  "Add full file to chat as context.
+if ARG is current prefix, ask for file, otherwise add current file."
+  (interactive "P")
+  (eca-assert-session-running (eca-session))
+  (-let ((path (if (equal arg '(4))
+                   (read-file-name "Select the file to add to context: " (eca-find-root-for-buffer))
+                 (buffer-file-name))))
+    (with-current-buffer (eca-chat--get-buffer (eca-session))
+      (eca-chat--add-context (list :type "file"
+                                   :path path))
+      (eca-chat-open (eca-session)))))
 
 (declare-function whisper-run "ext:whisper" ())
 

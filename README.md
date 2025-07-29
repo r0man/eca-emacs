@@ -73,7 +73,8 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 
 ### Functions
 
-- `eca-chat-add-context`: Add the current function or selected lines to chat as context.
+- `eca-chat-add-context-at-point`: Add the current function or selected lines to chat as context.
+- `eca-chat-add-file-context`: Add the current file to chat as context.
 
 ### Variables 
 
