@@ -729,7 +729,10 @@ If FORCE? decide to OPEN? or not."
       (-let (((&plist :type type) context))
         (insert
          (pcase type
-           ("file" (propertize (concat eca-chat-context-prefix (f-filename (plist-get context :path)))
+           ("file" (propertize (concat eca-chat-context-prefix
+                                       (f-filename (plist-get context :path))
+                                       (-when-let ((&plist :start start :end end) (plist-get context :linesRange))
+                                         (format " (%d-%d)" start end)))
                                'eca-chat-context-item context
                                'font-lock-face 'eca-chat-context-file-face))
            ("directory" (propertize (concat eca-chat-context-prefix (f-filename (plist-get context :path)))
@@ -1060,6 +1063,22 @@ If FORCE? decide to OPEN? or not."
     (setq-local eca-chat--message-cost nil)
     (setq-local eca-chat--session-cost nil)
     (eca-chat--clear (eca-session))))
+
+;;;###autoload
+(defun eca-chat-add-context ()
+  "Add file content with range to chat as context.
+Consider the defun at point unless a region is selected."
+  (interactive)
+  (eca-assert-session-running (eca-session))
+  (-let (((start . end) (if (use-region-p)
+                            `(,(line-number-at-pos (region-beginning)) . ,(line-number-at-pos (region-end)))
+                          (-let (((s . e) (bounds-of-thing-at-point 'defun)))
+                            `(,(line-number-at-pos s) . ,(line-number-at-pos e)))))
+         (path (buffer-file-name)))
+    (with-current-buffer (eca-chat--get-buffer (eca-session))
+      (eca-chat--add-context (list :type "file"
+                                   :path path
+                                   :linesRange (list :start start :end end))))))
 
 (declare-function whisper-run "ext:whisper" ())
 

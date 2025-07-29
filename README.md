@@ -69,7 +69,13 @@ accuracy and transcription speed.
 
 Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the process.
 
-## Optional interesting settings
+## Tips
+
+### Functions
+
+- `eca-chat-add-context`: Add the current function or selected lines to chat as context.
+
+### Variables 
 
 - `eca-chat-usage-string-format`: to customize what shows on mode-line for usage like costs and tokens.
 - `eca-chat-position-params`: customize the chat window.
