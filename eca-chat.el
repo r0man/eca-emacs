@@ -26,16 +26,38 @@
   :type 'hook
   :group 'eca)
 
-(defcustom eca-chat-window-width 0.35
-  "The width of `eca' dedicated chat window."
+(defcustom eca-chat-window-side 'right
+  "Side of the frame where the ECA chat window should appear.
+Can be `'left', `'right', `'top', or `'bottom'.  This setting will only
+be used when `eca-chat-use-side-window' is non-nil."
+  :type '(choice (const :tag "Left" left)
+                 (const :tag "Right" right)
+                 (const :tag "Top" top)
+                 (const :tag "Bottom" bottom))
+  :group 'eca)
+
+(defcustom eca-chat-window-width 90
+  "Width of the ECA chat side window when opened on left or right."
   :type 'integer
   :group 'eca)
 
-(defcustom eca-chat-position-params `((display-buffer-in-side-window)
-                                      (side . right)
-                                      (window-width . ,eca-chat-window-width))
-  "Position params for each chat display."
-  :type 'alist
+(defcustom eca-chat-window-height 20
+  "Height of the ECA chat side window when opened on top or bottom."
+  :type 'integer
+  :group 'eca)
+
+(defcustom eca-chat-use-side-window t
+  "Whether to display ECA chat in a side window.
+When non-nil (default), ECA chat opens in a dedicated side window
+controlled by `eca-chat-window-side' and related settings.  When nil,
+ECA chat opens in a regular buffer that follows standard
+`display-buffer' behavior."
+  :type 'boolean
+  :group 'eca)
+
+(defcustom eca-chat-focus-on-open t
+  "Whether to focus the ECA chat window when it opens."
+  :type 'boolean
   :group 'eca)
 
 (defcustom eca-chat-prompt-prefix "> "
@@ -577,12 +599,40 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
   "Select the Window."
   (select-window (get-buffer-window (buffer-name))))
 
+(defun eca-chat--display-buffer (buffer)
+  "Display BUFFER in a side window according to customization.
+The window is displayed on the side specified by
+`eca-chat-window-side' with dimensions from
+`eca-chat-window-width' or `eca-chat-window-height'.
+If `eca-chat-focus-on-open' is non-nil, the window is selected."
+  (let ((window
+         (if eca-chat-use-side-window
+             ;; Use side window
+             (let* ((side eca-chat-window-side)
+                    (slot 0)
+                    (window-parameters '((no-delete-other-windows . t)))
+                    (display-buffer-alist
+                     `((,(regexp-quote (buffer-name buffer))
+                        (display-buffer-in-side-window)
+                        (side . ,side)
+                        (slot . ,slot)
+                        ,@(when (memq side '(left right))
+                            `((window-width . ,eca-chat-window-width)))
+                        ,@(when (memq side '(top bottom))
+                            `((window-height . ,eca-chat-window-height)))
+                        (window-parameters . ,window-parameters)))))
+               (display-buffer buffer))
+           ;; Use regular buffer
+           (display-buffer buffer))))
+    ;; Select the window to give it focus if configured to do so
+    (when (and window eca-chat-focus-on-open)
+      (select-window window))
+    window))
+
 (defun eca-chat--pop-window ()
   "Pop eca dedicated window if it exists."
   (let ((buffer (current-buffer)))
-    (display-buffer buffer eca-chat-position-params)
-    (select-window (get-buffer-window buffer))
-    (set-window-buffer (get-buffer-window buffer) buffer)))
+    (eca-chat--display-buffer buffer)))
 
 (defun eca-chat--mark-header ()
   "Mark last messages header."
