@@ -38,13 +38,12 @@ be used when `eca-chat-use-side-window' is non-nil."
 
 (defcustom eca-chat-window-width 0.40
   "Width of the ECA chat side window when opened on left or right."
-  :type 'integer
+  :type 'number
   :group 'eca)
 
-(defcustom eca-chat-window-height 20
 (defcustom eca-chat-window-height 0.30
   "Height of the ECA chat side window when opened on top or bottom."
-  :type 'integer
+  :type 'number
   :group 'eca)
 
 (defcustom eca-chat-use-side-window t
