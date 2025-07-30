@@ -1014,7 +1014,7 @@ If FORCE? decide to OPEN? or not."
                              (origin (plist-get content :origin))
                              (args (plist-get content :arguments))
                              (outputs (append (plist-get content :outputs) nil))
-                             (any-error? (-any-p (lambda (output) (plist-get output :error)) outputs))
+                             (error? (plist-get content :error))
                              (output-contents (-reduce-from (lambda (txt output) (concat txt "\n" (plist-get output :content)))
                                                             ""
                                                             outputs)))
@@ -1025,7 +1025,7 @@ If FORCE? decide to OPEN? or not."
                                              'font-lock-face 'eca-chat-mcp-tool-call-label-face)
                                  (propertize name 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
                                  " "
-                                 (if any-error?
+                                 (if error?
                                      eca-chat-mcp-tool-call-error-symbol
                                    eca-chat-mcp-tool-call-success-symbol))
                          (eca-chat--content-table `(("Arguments" . ,args)
