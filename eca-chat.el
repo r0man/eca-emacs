@@ -805,15 +805,26 @@ If FORCE? decide to OPEN? or not."
 (defconst eca-chat--kind->symbol
   '(("file" . file)
     ("directory" . folder)
-    ("repoMap" . module)))
+    ("repoMap" . module)
+    ("mcpPrompt" . function)
+    ("native" . variable)))
 
-(defun eca-chat--completion-candidate-kind (item)
+(defun eca-chat--completion-item-kind (item)
   "Return the kind for ITEM."
-  (alist-get (plist-get (get-text-property 0 'eca-chat-completion-item item) :type)
+  (alist-get (plist-get item :type)
              eca-chat--kind->symbol
              nil
              nil
              #'string=))
+
+(defun eca-chat--completion-item-label-kind (item-label)
+  "Return the kind for ITEM-LABEL."
+  (eca-chat--completion-item-kind (get-text-property 0 'eca-chat-completion-item item-label)))
+
+(defun eca-chat--completion-item-company-box-icon (item-label)
+  "Return the kind for ITEM-LABEL."
+  (let ((symbol (eca-chat--completion-item-label-kind item-label)))
+    (intern (capitalize (symbol-name symbol)))))
 
 (defun eca-chat--add-context (context)
   "Add to chat CONTEXT."
@@ -853,7 +864,8 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--command-to-completion (command)
   "Convert COMMAND to a completion item."
-  (propertize (plist-get command :name) 'eca-chat-completion-item command))
+  (propertize (plist-get command :name)
+              'eca-chat-completion-item command))
 
 ;; Public
 
@@ -871,6 +883,10 @@ If FORCE? decide to OPEN? or not."
   (when (fboundp 'company-mode)
     (company-mode 1)
     (setq-local company-backends '(company-capf)))
+
+  (make-local-variable 'company-box-icons-functions)
+  (when (featurep 'company-box)
+    (add-to-list 'company-box-icons-functions #'eca-chat--completion-item-company-box-icon))
 
   (let ((session (eca-session)))
     (unless (listp header-line-format)
@@ -958,7 +974,7 @@ If FORCE? decide to OPEN? or not."
         ((eq (car-safe action) 'boundaries) nil)
         (t
          (complete-with-action action (funcall candidates-fn) probe pred))))
-     :company-kind #'eca-chat--completion-candidate-kind
+     :company-kind #'eca-chat--completion-item-label-kind
      :company-require-match 'never
      :annotation-function annotation-fn
      :exit-function exit-fn)))
