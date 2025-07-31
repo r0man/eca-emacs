@@ -215,6 +215,11 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for the strings segments in usage string in mode-line of the chat."
   :group 'eca)
 
+(defface eca-chat-command-description-face
+  '((t :inherit font-lock-comment-face))
+  "Face for the descriptions in chat command completion."
+  :group 'eca)
+
 ;; Internal
 
 (defvar-local eca-chat--closed nil)
@@ -815,7 +820,7 @@ If FORCE? decide to OPEN? or not."
   (add-to-list 'eca-chat--context context t)
   (eca-chat--refresh-context))
 
-(defun eca-chat--completion-annotate (roots item-label)
+(defun eca-chat--completion-context-annotate (roots item-label)
   "Annonate ITEM-LABEL detail for ROOTS."
   (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
     (pcase type
@@ -824,7 +829,14 @@ If FORCE? decide to OPEN? or not."
       ("repoMap" "Summary view of workspaces files")
       (_ ""))))
 
-(defun eca-chat--completion-exit-function (item _status)
+(defun eca-chat--completion-prompts-annotate (item-label)
+  "Annonate prompt ITEM-LABEL."
+  (-let (((&plist :description description :arguments args) (get-text-property 0 'eca-chat-completion-item item-label)))
+    (concat "(" (string-join (--map (plist-get it :name) args) ", ")
+            ") "
+            (truncate-string-to-width description (* 100 eca-chat-window-width)))))
+
+(defun eca-chat--completion-context-exit-function (item _status)
   "Add to context the selected ITEM."
   (eca-chat--add-context (get-text-property 0 'eca-chat-completion-item item))
   (end-of-line))
@@ -838,6 +850,10 @@ If FORCE? decide to OPEN? or not."
      ("repoMap" "repoMap")
      (_ (concat "Unknown - " (plist-get context :type))))
    'eca-chat-completion-item context))
+
+(defun eca-chat--command-to-completion (command)
+  "Convert COMMAND to a completion item."
+  (propertize (plist-get command :name) 'eca-chat-completion-item command))
 
 ;; Public
 
@@ -887,20 +903,51 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat-completion-at-point ()
   "Complete at point in the chat."
-  (let ((candidates (lambda ()
-                      (cond
-                       ((eca-chat--point-at-new-context-p)
-                        (-let (((&plist :contexts contexts) (eca-api-request-sync
-                                                             (eca-session)
-                                                             :method "chat/queryContext"
-                                                             :params (list :chatId eca-chat--id
-                                                                           :query (thing-at-point 'symbol t)
-                                                                           :contexts (vconcat eca-chat--context)))))
-                          (-map #'eca-chat--context-to-completion contexts)))
-                       (t nil)))))
+  (let* ((full-text (buffer-substring-no-properties (line-beginning-position) (point)))
+         (type (cond
+                ;; completing contexts
+                ((eca-chat--point-at-new-context-p)
+                 'contexts)
+
+                ;; completing commands with `/`
+                ((and (eca-chat--point-at-prompt-field-p)
+                      (string-prefix-p "/" full-text))
+                 'prompts)
+
+                (t nil)))
+         (bounds-start (pcase type
+                         ('prompts (1+ (line-beginning-position)))
+                         (_ (or
+                             (cl-first (bounds-of-thing-at-point 'symbol))
+                             (point)))))
+         (candidates-fn (lambda ()
+                          (pcase type
+                            ('contexts
+                             (-let (((&plist :contexts contexts) (eca-api-request-sync
+                                                                  (eca-session)
+                                                                  :method "chat/queryContext"
+                                                                  :params (list :chatId eca-chat--id
+                                                                                :query (thing-at-point 'symbol t)
+                                                                                :contexts (vconcat eca-chat--context)))))
+                               (-map #'eca-chat--context-to-completion contexts)))
+
+                            ('prompts
+                             (-let (((&plist :commands commands) (eca-api-request-sync
+                                                                  (eca-session)
+                                                                  :method "chat/queryCommands"
+                                                                  :params (list :chatId eca-chat--id
+                                                                                :query (substring full-text 1)))))
+                               (-map #'eca-chat--command-to-completion commands)))
+
+                            (_ nil))))
+         (exit-fn (pcase type
+                    ('contexts #'eca-chat--completion-context-exit-function)
+                    (_ nil)))
+         (annotation-fn (pcase type
+                          ('contexts (-partial #'eca-chat--completion-context-annotate (eca--session-workspace-folders (eca-session))))
+                          ('prompts #'eca-chat--completion-prompts-annotate))))
     (list
-     (or (cl-first (bounds-of-thing-at-point 'symbol))
-         (point))
+     bounds-start
      (point)
      (lambda (probe pred action)
        (cond
@@ -910,10 +957,11 @@ If FORCE? decide to OPEN? or not."
            (cycle-sort-function . identity)))
         ((eq (car-safe action) 'boundaries) nil)
         (t
-         (complete-with-action action (funcall candidates) probe pred))))
+         (complete-with-action action (funcall candidates-fn) probe pred))))
      :company-kind #'eca-chat--completion-candidate-kind
-     :annotation-function (-partial #'eca-chat--completion-annotate (eca--session-workspace-folders (eca-session)))
-     :exit-function #'eca-chat--completion-exit-function)))
+     :company-require-match 'never
+     :annotation-function annotation-fn
+     :exit-function exit-fn)))
 
 (defun eca-chat-content-received (session params)
   "Handle the content received notification with PARAMS for SESSION."
