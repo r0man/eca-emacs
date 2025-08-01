@@ -187,6 +187,13 @@ When ARG is current prefix, ask for workspace roots to use."
       (eca-delete-session session))))
 
 ;;;###autoload
+(defun eca-restart ()
+  "Restart eca, if not running just start."
+  (interactive)
+  (eca-stop)
+  (eca))
+
+;;;###autoload
 (defun eca-workspaces ()
   "Return workspaces used by current session."
   (interactive)
