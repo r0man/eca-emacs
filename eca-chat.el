@@ -416,9 +416,8 @@ Otherwise to a not loading state."
 
    ;; context completion
    ((and (eca-chat--prompt-context-field-ov)
-         (eolp)
-         (functionp 'company-complete))
-    (company-complete))
+         (eolp))
+    (completion-at-point))
 
    (t t)))
 
@@ -880,9 +879,6 @@ If FORCE? decide to OPEN? or not."
 
   (make-local-variable 'completion-at-point-functions)
   (setq-local completion-at-point-functions (list #'eca-chat-completion-at-point))
-  (when (fboundp 'company-mode)
-    (company-mode 1)
-    (setq-local company-backends '(company-capf)))
 
   (make-local-variable 'company-box-icons-functions)
   (when (featurep 'company-box)
