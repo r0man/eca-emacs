@@ -1152,7 +1152,7 @@ If FORCE? decide to OPEN? or not."
       (setq eca-chat--closed t)
       (force-mode-line-update)
       (goto-char (point-max))
-      (rename-buffer "<eca-chat:closed>")
+      (rename-buffer (concat (buffer-name) ":closed") t)
       (when-let* ((window (get-buffer-window (eca-chat--get-buffer session))))
         (quit-window nil window)))))
 
