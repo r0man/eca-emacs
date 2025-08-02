@@ -83,17 +83,18 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 
 ### Keybindings
 
-| Feature                   | key                                |
-|---------------------------|------------------------------------|
-| Chat: clear               | <kbd>C-c</kbd> <kbd>l</kbd>        |
-| Chat: reset               | <kbd>C-c</kbd> <kbd>k</kbd>        |
-| Chat: talk                | <kbd>C-c</kbd> <kbd>t</kbd>        |
-| Chat: prev prompt history | <kbd>C-&uarr;</kbd>                |
-| Chat: next prompt history | <kbd>C-&darr;</kbd>                |
-| Chat: go to prev block    | <kbd>C-c</kbd> <kbd>&uarr;</kbd>   |
-| Chat: go to next block    | <kbd>C-c</kbd> <kbd>&darr;</kbd>   |
-| Chat: go to prev user msg | <kbd>C-c</kbd> <kbd>C-&uarr;</kbd> |
-| Chat: go to next user msg | <kbd>C-c</kbd> <kbd>C-&darr;</kbd> |
+| Feature                         | key                                |
+|---------------------------------|------------------------------------|
+| Chat: clear                     | <kbd>C-c</kbd> <kbd>l</kbd>        |
+| Chat: reset                     | <kbd>C-c</kbd> <kbd>k</kbd>        |
+| Chat: talk                      | <kbd>C-c</kbd> <kbd>t</kbd>        |
+| Chat: prev prompt history       | <kbd>C-&uarr;</kbd>                |
+| Chat: next prompt history       | <kbd>C-&darr;</kbd>                |
+| Chat: go to prev block          | <kbd>C-c</kbd> <kbd>&uarr;</kbd>   |
+| Chat: go to next block          | <kbd>C-c</kbd> <kbd>&darr;</kbd>   |
+| Chat: go to prev user msg       | <kbd>C-c</kbd> <kbd>C-&uarr;</kbd> |
+| Chat: go to next user msg       | <kbd>C-c</kbd> <kbd>C-&darr;</kbd> |
+| Chat: toggle expandable content | <kbd>C-c</kbd> <kbd>Tab</kbd> |
 
 ## Contributing
 

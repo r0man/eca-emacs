@@ -259,6 +259,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "C-c C-<down>") #'eca-chat-go-to-next-user-message)
     (define-key map (kbd "C-c <up>") #'eca-chat-go-to-prev-expandable-block)
     (define-key map (kbd "C-c <down>") #'eca-chat-go-to-next-expandable-block)
+    (define-key map (kbd "C-c <tab>") #'eca-chat-toggle-expandable-block)
     map)
   "Keymap used by `eca-chat-mode'.")
 
@@ -876,10 +877,11 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--go-to-overlay (ov-key range-min range-max first?)
   "Go to overlay finding from RANGE-MIN to RANGE-MAX if matches OV-KEY."
-  (let ((get-fn (if first? #'-first #'-last)))
-    (when-let ((ov (funcall get-fn (-lambda (ov) (overlay-get ov ov-key))
-                            (overlays-in range-min range-max))))
-      (goto-char (overlay-start ov)))))
+  (with-current-buffer (eca-chat--get-buffer (eca-session))
+    (let ((get-fn (if first? #'-first #'-last)))
+      (when-let ((ov (funcall get-fn (-lambda (ov) (overlay-get ov ov-key))
+                              (overlays-in range-min range-max))))
+        (goto-char (overlay-start ov))))))
 
 ;; Public
 
@@ -1216,7 +1218,19 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-go-to-next-expandable-block ()
   "Go to the next expandable block from point."
   (interactive)
+  (eca-assert-session-running (eca-session))
   (eca-chat--go-to-overlay 'eca-chat--expandable-content-id (1+ (point)) (point-max) t))
+
+;;;###autoload
+(defun eca-chat-toggle-expandable-block ()
+  "Toggle current expandable block at point."
+  (interactive)
+  (eca-assert-session-running (eca-session))
+  (with-current-buffer (eca-chat--get-buffer (eca-session))
+    (unless (eca-chat--expandable-content-at-point)
+      (eca-chat-go-to-prev-expandable-block))
+    (when-let ((ov (eca-chat--expandable-content-at-point)))
+      (eca-chat--expandable-content-toggle (overlay-get ov 'eca-chat--expandable-content-id)))))
 
 ;;;###autoload
 (defun eca-chat-add-context-at-point ()
