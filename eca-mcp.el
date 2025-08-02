@@ -33,6 +33,11 @@
   "Face for tools showed in mcp details buffer."
   :group 'eca)
 
+(defface eca-mcp-details-button-face
+  '((t (:inherit button)))
+  "Face for buttons in mcp details buffer."
+  :group 'eca)
+
 ;; Internal
 
 (defun eca-mcp-details-buffer-name (session)
@@ -68,7 +73,21 @@
                                                 ("starting" 'warning)
                                                 ("failed" 'error)
                                                 ("stopped" 'default)
+                                                ("stopping" 'default)
                                                 ("disabled" 'shadow))))
+          (insert " "
+                  (if (or (string= "running" status)
+                          (string= "starting" status))
+                      (eca-buttonize
+                       (propertize "stop" 'font-lock-face 'eca-mcp-details-button-face)
+                       (lambda () (eca-api-notify session
+                                                  :method "mcp/stopServer"
+                                                  :params (list :name name))))
+                    (eca-buttonize
+                     (propertize "start" 'font-lock-face 'eca-mcp-details-button-face)
+                     (lambda () (eca-api-notify session
+                                                :method "mcp/startServer"
+                                                :params (list :name name))))))
           (insert "\n")
           (if (seq-empty-p tools)
               (insert (propertize "No tools available" 'font-lock-face font-lock-doc-face))

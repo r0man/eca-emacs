@@ -337,20 +337,6 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (eca-chat--insert-prompt-string)
     (eca-chat--refresh-context)))
 
-(defun eca-chat--buttonize (text callback)
-  "Create a actionable TEXT that call CALLBACK when actioned."
-  (let ((km (make-sparse-keymap))
-        (callback-int (lambda (&rest _)
-                        (interactive)
-                        (funcall callback))))
-    (define-key km (kbd "<mouse-1>") callback-int)
-    (define-key km (kbd "<tab>") callback-int)
-    (define-key km (kbd "<return>") callback-int)
-    (propertize text
-                'eca-chat-on-action callback
-                'pointer 'hand
-                'keymap km)))
-
 (defun eca-chat--stop-prompt (session)
   "Stop the running chat prompt for SESSION."
   (when eca-chat--chat-loading
@@ -366,7 +352,7 @@ Otherwise to a not loading state."
   (unless (eq eca-chat--chat-loading loading)
     (setq-local eca-chat--chat-loading loading)
     (let ((prompt-field-ov (eca-chat--prompt-field-ov))
-          (stop-text (eca-chat--buttonize
+          (stop-text (eca-buttonize
                       (propertize "stop" 'font-lock-face 'eca-chat-prompt-stop-face)
                       (lambda () (eca-chat--stop-prompt session)))))
       (if eca-chat--chat-loading
@@ -511,9 +497,9 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
                              (setq-local eca-chat--id (plist-get res :chatId)))))
 
        ;; check it's an actionable text
-       ((-some->> (thing-at-point 'symbol) (get-text-property 0 'eca-chat-on-action))
+       ((-some->> (thing-at-point 'symbol) (get-text-property 0 'eca-button-on-action))
         (-some->> (thing-at-point 'symbol)
-          (get-text-property 0 'eca-chat-on-action)
+          (get-text-property 0 'eca-button-on-action)
           (funcall)))
 
        ;; check is inside a expandable text
@@ -1018,7 +1004,7 @@ If FORCE? decide to OPEN? or not."
         ("url" (eca-chat--add-header
                 (concat
                  "🌐 "
-                 (eca-chat--buttonize
+                 (eca-buttonize
                   (plist-get content :title)
                   (lambda() (browse-url (plist-get content :url))))
                  "\n\n")))
@@ -1062,13 +1048,13 @@ If FORCE? decide to OPEN? or not."
                                   (when manual?
                                     (concat
                                      " "
-                                     (eca-chat--buttonize
+                                     (eca-buttonize
                                       (propertize "cancel" 'font-lock-face 'eca-chat-tool-call-cancel-face)
                                       (lambda () (eca-api-notify session
                                                                  :method "chat/toolCallReject"
                                                                  :params (list :chatId eca-chat--id :toolCallId id))))
                                      " "
-                                     (eca-chat--buttonize
+                                     (eca-buttonize
                                       (propertize "run" 'font-lock-face 'eca-chat-tool-call-run-face)
                                       (lambda () (eca-api-notify session
                                                                  :method "chat/toolCallApprove"
