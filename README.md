@@ -85,9 +85,9 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 
 | Feature                         | key                                |
 |---------------------------------|------------------------------------|
-| Chat: clear                     | <kbd>C-c</kbd> <kbd>l</kbd>        |
-| Chat: reset                     | <kbd>C-c</kbd> <kbd>k</kbd>        |
-| Chat: talk                      | <kbd>C-c</kbd> <kbd>t</kbd>        |
+| Chat: clear                     | <kbd>C-c</kbd> <kbd>C-l</kbd>        |
+| Chat: reset                     | <kbd>C-c</kbd> <kbd>C-k</kbd>        |
+| Chat: talk                      | <kbd>C-c</kbd> <kbd>C-t</kbd>        |
 | Chat: prev prompt history       | <kbd>C-&uarr;</kbd>                |
 | Chat: next prompt history       | <kbd>C-&darr;</kbd>                |
 | Chat: go to prev block          | <kbd>C-c</kbd> <kbd>&uarr;</kbd>   |
