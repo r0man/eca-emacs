@@ -874,11 +874,12 @@ If FORCE? decide to OPEN? or not."
   (propertize (plist-get command :name)
               'eca-chat-completion-item command))
 
-(defun eca-chat--go-to-overlay (ov-key range-min range-max)
+(defun eca-chat--go-to-overlay (ov-key range-min range-max first?)
   "Go to overlay finding from RANGE-MIN to RANGE-MAX if matches OV-KEY."
-  (when-let ((ov (-last (-lambda (ov) (overlay-get ov ov-key))
-                        (overlays-in range-min range-max))))
-    (goto-char (overlay-start ov))))
+  (let ((get-fn (if first? #'-first #'-last)))
+    (when-let ((ov (funcall get-fn (-lambda (ov) (overlay-get ov ov-key))
+                            (overlays-in range-min range-max))))
+      (goto-char (overlay-start ov)))))
 
 ;; Public
 
@@ -1195,27 +1196,27 @@ If FORCE? decide to OPEN? or not."
   "Go to the previous user message from point."
   (interactive)
   (eca-assert-session-running (eca-session))
-  (eca-chat--go-to-overlay 'eca-chat--user-message-id (point-min) (point)))
+  (eca-chat--go-to-overlay 'eca-chat--user-message-id (point-min) (point) nil))
 
 ;;;###autoload
 (defun eca-chat-go-to-next-user-message ()
   "Go to the next user message from point."
   (interactive)
   (eca-assert-session-running (eca-session))
-  (eca-chat--go-to-overlay 'eca-chat--user-message-id (point) (point-max)))
+  (eca-chat--go-to-overlay 'eca-chat--user-message-id (1+ (point)) (point-max) t))
 
 ;;;###autoload
 (defun eca-chat-go-to-prev-expandable-block ()
   "Go to the previous expandable block from point."
   (interactive)
   (eca-assert-session-running (eca-session))
-  (eca-chat--go-to-overlay 'eca-chat--expandable-content-id (point-min) (point)))
+  (eca-chat--go-to-overlay 'eca-chat--expandable-content-id (point-min) (point) nil))
 
 ;;;###autoload
 (defun eca-chat-go-to-next-expandable-block ()
   "Go to the next expandable block from point."
   (interactive)
-  (eca-chat--go-to-overlay 'eca-chat--expandable-content-id (point) (point-max)))
+  (eca-chat--go-to-overlay 'eca-chat--expandable-content-id (1+ (point)) (point-max) t))
 
 ;;;###autoload
 (defun eca-chat-add-context-at-point ()
