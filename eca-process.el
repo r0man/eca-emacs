@@ -24,6 +24,12 @@ If not provided, download and start eca automatically."
   :risky t
   :type '(repeat string))
 
+(defcustom eca-extra-args '()
+  "The extra args to pass to eca server command."
+  :group 'eca
+  :risky t
+  :type '(repeat string))
+
 (defcustom eca-server-download-url nil
   "The custom URL to download eca server."
   :group 'eca
@@ -297,7 +303,7 @@ Call HANDLE-MSG for new msgs processed."
                                        :coding 'no-conversion
                                        :connection-type 'pipe
                                        :name "eca"
-                                       :command command
+                                       :command (append command eca-extra-args)
                                        :buffer (eca-process--buffer-name session)
                                        :stderr (get-buffer-create (eca-process--stderr-buffer-name session))
                                        :filter (-partial #'eca-process--filter handle-msg)
