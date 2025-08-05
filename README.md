@@ -76,6 +76,7 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 
 ### Variables 
 
+- `eca-extra-args`: customize extra args to server to help debug like `("--verbose")` or `("--log-level" "debug")`.
 - `eca-chat-usage-string-format`: to customize what shows on mode-line for usage like costs and tokens.
 - `eca-chat-position-params`: customize the chat window.
 
