@@ -160,6 +160,11 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Face for contexts of repoMap type."
   :group 'eca)
 
+(defface eca-chat-context-mcp-resource-face
+  '((t (:foreground "lime green" :underline t)))
+  "Face for contexts of mcpResource type."
+  :group 'eca)
+
 (defface eca-chat-user-messages-face
   '((t :inherit font-lock-doc-face))
   "Face for the user sent messages in chat."
@@ -791,6 +796,9 @@ If FORCE? decide to OPEN? or not."
            ("repoMap" (propertize (concat eca-chat-context-prefix "repoMap")
                                   'eca-chat-context-item context
                                   'font-lock-face 'eca-chat-context-repo-map-face))
+           ("mcpResource" (propertize (concat eca-chat-context-prefix (plist-get context :server) ":" (plist-get context :name))
+                                      'eca-chat-context-item context
+                                      'font-lock-face 'eca-chat-context-mcp-resource-face))
            (_ (propertize (concat eca-chat-context-prefix "unkown:" type)
                           'eca-chat-context-item context))))
         (insert " ")))
@@ -801,6 +809,7 @@ If FORCE? decide to OPEN? or not."
     ("directory" . folder)
     ("repoMap" . module)
     ("mcpPrompt" . function)
+    ("mcpResource" . file)
     ("native" . variable)))
 
 (defun eca-chat--completion-item-kind (item)
@@ -827,11 +836,12 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--completion-context-annotate (roots item-label)
   "Annonate ITEM-LABEL detail for ROOTS."
-  (-let (((&plist :type type :path path) (get-text-property 0 'eca-chat-completion-item item-label)))
+  (-let (((&plist :type type :path path :description description) (get-text-property 0 'eca-chat-completion-item item-label)))
     (pcase type
       ("file" (eca-chat--relativize-filename-for-workspace-root path roots))
       ("directory" (eca-chat--relativize-filename-for-workspace-root path roots))
       ("repoMap" "Summary view of workspaces files")
+      ("mcpResource" description)
       (_ ""))))
 
 (defun eca-chat--completion-prompts-annotate (item-label)
@@ -853,6 +863,7 @@ If FORCE? decide to OPEN? or not."
      ("file" (f-filename (plist-get context :path)))
      ("directory" (f-filename (plist-get context :path)))
      ("repoMap" "repoMap")
+     ("mcpResource" (concat (plist-get context :server) ":" (plist-get context :name)))
      (_ (concat "Unknown - " (plist-get context :type))))
    'eca-chat-completion-item context))
 
