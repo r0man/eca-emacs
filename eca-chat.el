@@ -186,7 +186,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :group 'eca)
 
 (defface eca-chat-mcp-tool-call-label-face
-  '((t :inherit font-lock-function-call-face :underline t))
+  '((t :inherit font-lock-function-call-face))
   "Face for the MCP tool calls in chat."
   :group 'eca)
 
@@ -196,8 +196,13 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   :group 'eca)
 
 (defface eca-chat-file-change-label-face
-  '((t :inherit link))
+  '((t :inherit diff-file-header))
   "Face for file changes labels in chat."
+  :group 'eca)
+
+(defface eca-chat-file-path-face
+  '((t :inherit link))
+  "Face for file paths in chat."
   :group 'eca)
 
 (defface eca-chat--tool-call-argument-key-face
@@ -779,7 +784,11 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--file-change-diff (path diff)
   "Return a diff block for PATH with DIFF."
-  (concat path "\n"
+  (concat "\n"
+          (if (f-exists? path)
+              (eca-buttonize (propertize path 'font-lock-face 'eca-chat-file-path-face)
+                             (lambda () (find-file path)))
+            path) "\n"
           "```diff\n" diff "\n```"))
 
 (defun eca-chat--file-change-details-label (details)
