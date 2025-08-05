@@ -920,13 +920,13 @@ If FORCE? decide to OPEN? or not."
          (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
          (when (fboundp 'company-mode) (setq-local company-backends '(company-capf)))
          (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
-         (force-mode-line-update)))))
+         (force-mode-line-update)
+         (run-hooks 'eca-chat-mode-hook)))))
 
   (face-remap-add-relative 'markdown-line-break-face
                            '(:underline nil))
 
-  (goto-char (point-max))
-  (run-hooks 'eca-chat-mode-hook))
+  (goto-char (point-max)))
 
 (defun eca-chat-completion-at-point ()
   "Complete at point in the chat."
