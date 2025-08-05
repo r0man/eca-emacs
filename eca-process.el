@@ -297,22 +297,23 @@ Call HANDLE-MSG for new msgs processed."
   (unless (process-live-p (eca--session-process session))
     (-let* (((result &as &plist :decision decision :command command) (eca-process--server-command))
             (start-process-fn (lambda ()
-                                (eca-info "Starting process '%s'" (string-join command " "))
-                                (setf (eca--session-process session)
-                                      (make-process
-                                       :coding 'no-conversion
-                                       :connection-type 'pipe
-                                       :name "eca"
-                                       :command (append command eca-extra-args)
-                                       :buffer (eca-process--buffer-name session)
-                                       :stderr (get-buffer-create (eca-process--stderr-buffer-name session))
-                                       :filter (-partial #'eca-process--filter handle-msg)
-                                       :sentinel (lambda (process exit-str)
-                                                   (unless (process-live-p process)
-                                                     (eca-delete-session session)
-                                                     (eca-info "process has exited (%s)" (s-trim exit-str))))
-                                       :file-handler t
-                                       :noquery t))
+                                (let ((command (append command eca-extra-args)))
+                                  (eca-info "Starting process '%s'" (string-join command " "))
+                                  (setf (eca--session-process session)
+                                        (make-process
+                                         :coding 'no-conversion
+                                         :connection-type 'pipe
+                                         :name "eca"
+                                         :command command
+                                         :buffer (eca-process--buffer-name session)
+                                         :stderr (get-buffer-create (eca-process--stderr-buffer-name session))
+                                         :filter (-partial #'eca-process--filter handle-msg)
+                                         :sentinel (lambda (process exit-str)
+                                                     (unless (process-live-p process)
+                                                       (eca-delete-session session)
+                                                       (eca-info "process has exited (%s)" (s-trim exit-str))))
+                                         :file-handler t
+                                         :noquery t)))
                                 (funcall on-start))))
       (pcase decision
         ('custom (funcall start-process-fn))
@@ -340,11 +341,16 @@ Call HANDLE-MSG for new msgs processed."
 
 (defun eca-process-show-stderr (session)
   "Open the eca process stderr buffer for SESSION if running."
-  (interactive)
   (with-current-buffer (eca-process--stderr-buffer-name session)
     (if (window-live-p (get-buffer-window (buffer-name)))
         (select-window (get-buffer-window (buffer-name)))
       (display-buffer (current-buffer)))))
+
+;;;###autoload
+(defun eca-show-stderr ()
+  "Open the eca process stderr buffer if running."
+  (interactive)
+  (eca-process-show-stderr (eca-session)))
 
 ;;;###autoload
 (defun eca-install-server ()
