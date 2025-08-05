@@ -60,6 +60,11 @@ ECA chat opens in a regular buffer that follows standard
   :type 'boolean
   :group 'eca)
 
+(defcustom eca-chat-auto-add-repomap t
+  "Whether to auto include repoMap context when opening eca."
+  :type 'boolean
+  :group 'eca)
+
 (defcustom eca-chat-prompt-prefix "> "
   "The prompt prefix string used in eca chat buffer."
   :type 'string
@@ -1179,7 +1184,8 @@ If FORCE? decide to OPEN? or not."
   (with-current-buffer (eca-chat--get-buffer session)
     (unless (derived-mode-p 'eca-chat-mode)
       (eca-chat-mode)
-      (eca-chat--add-context (list :type "repoMap")))
+      (when eca-chat-auto-add-repomap
+        (eca-chat--add-context (list :type "repoMap"))))
     (unless (eca--session-chat session)
       (setf (eca--session-chat session) (current-buffer)))
     (if (window-live-p (get-buffer-window (buffer-name)))
