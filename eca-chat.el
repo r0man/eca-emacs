@@ -918,6 +918,7 @@ If FORCE? decide to OPEN? or not."
        (with-current-buffer (eca-chat--get-buffer (eca-session))
          (display-line-numbers-mode -1)
          (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
+         (when (fboundp 'company-mode) (setq-local company-backends '(company-capf)))
          (setq-local mode-line-format '(t (:eval (eca-chat--mode-line-string))))
          (force-mode-line-update)))))
 
