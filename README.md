@@ -95,6 +95,109 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 | Chat: go to next user msg       | <kbd>C-c</kbd> <kbd>C-&darr;</kbd> |
 | Chat: toggle expandable content | <kbd>C-c</kbd> <kbd>Tab</kbd> |
 
+### Troubleshooting
+
+#### Environment Variables Not Available (macOS/Linux GUI)
+
+When launching Emacs from a GUI application (Dock, Applications folder, or desktop environment), it doesn't inherit environment variables from your shell configuration files (`.zshrc`, `.bashrc`, etc.). Since the ECA server is started as a subprocess from Emacs, it inherits Emacs' environment, which may be missing your API keys and other configuration.
+
+##### Symptoms
+- ECA fails to start with authentication errors
+- Missing API keys for OpenAI, Anthropic, or other providers
+- Custom configuration variables not found
+
+##### Solution: Use exec-path-from-shell
+
+Install and configure `exec-path-from-shell` to import your shell environment into Emacs:
+
+```elisp
+(use-package exec-path-from-shell
+  :init
+  ;; Specify the environment variables ECA needs
+  (setq exec-path-from-shell-variables
+        '("ANTHROPIC_API_KEY"
+          "OPENAI_API_KEY"
+          "OLLAMA_API_BASE"
+          "OPENAI_API_URL"
+          "ANTHROPIC_API_URL"
+          "ECA_CONFIG"
+          "XDG_CONFIG_HOME"
+          "PATH"
+          "MANPATH"))
+  ;; For macOS and Linux GUI environments
+  (when (memq window-system '(mac ns x))
+    (exec-path-from-shell-initialize)))
+```
+
+#### Alternative Solutions
+
+1. **Launch Emacs from Terminal**: Start Emacs from your shell where environment variables are already loaded:
+   ```bash
+   emacs &
+   ```
+
+2. **Manual Environment Setup**: Set variables directly in your Emacs configuration:
+   ```elisp
+   (setenv "ANTHROPIC_API_KEY" "your-key-here")
+   (setenv "OPENAI_API_KEY" "your-key-here")
+   ```
+
+3. **System-wide Environment**: On macOS, you can set environment variables system-wide using `launchctl`:
+   ```bash
+   launchctl setenv ANTHROPIC_API_KEY "your-key-here"
+   ```
+
+### ECA Server Connection Issues
+
+#### Problem: ECA server fails to start or connect
+
+1. **Check ECA installation**: Verify ECA is available on your PATH or set `eca-custom-command`:
+   ```elisp
+   (setq eca-custom-command "/path/to/your/eca/binary")
+   ```
+
+2. **Enable debug logging**: Add extra arguments for debugging:
+   ```elisp
+   (setq eca-extra-args '("--verbose" "--log-level" "debug"))
+   ```
+
+3. **Check environment variables**: Test if your API keys are available in Emacs:
+   ```elisp
+   M-x eval-expression RET (getenv "ANTHROPIC_API_KEY") RET
+   ```
+
+### Model-Specific Issues
+
+#### OpenAI Models Not Working
+- Ensure `OPENAI_API_KEY` is set in your environment
+- For custom endpoints, set `OPENAI_API_URL`
+
+#### Anthropic Models Not Working
+- Ensure `ANTHROPIC_API_KEY` is set in your environment
+- For custom endpoints, set `ANTHROPIC_API_URL`
+
+#### Ollama Models Not Working
+- Ensure Ollama is running locally
+- Set `OLLAMA_API_BASE` if using a custom endpoint
+- Use the `ollama/` prefix for model names (e.g., `ollama/llama2`)
+
+### Debugging Steps
+
+1. **Verify environment**: Check what environment variables are available to Emacs:
+   ```elisp
+   M-x eval-expression RET process-environment RET
+   ```
+
+2. **Test ECA manually**: Try running ECA from terminal to verify it works:
+   ```bash
+   eca --help
+   ```
+4. **Reset ECA**: Clear the workspace and restart:
+   ```
+   M-x eca-chat-reset
+   M-x eca  ; Start fresh
+   ```
+
 ## Contributing
 
 Contributions are very welcome, please open a issue for discussion or pull request.
