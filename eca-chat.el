@@ -782,12 +782,13 @@ If FORCE? decide to OPEN? or not."
    ""
    key-vals))
 
-(defun eca-chat--file-change-diff (path diff)
-  "Return a diff block for PATH with DIFF."
+(defun eca-chat--file-change-diff (path diff roots)
+  "Return a diff block for relative PATH from ROOTS with DIFF."
   (concat "\n"
           (if (f-exists? path)
-              (eca-buttonize (propertize path 'font-lock-face 'eca-chat-file-path-face)
-                             (lambda () (find-file path)))
+              (eca-buttonize (propertize (eca-chat--relativize-filename-for-workspace-root path roots)
+                                         'font-lock-face 'eca-chat-file-path-face)
+                             (lambda () (find-file-other-window path)))
             path) "\n"
           "```diff\n" diff "\n```"))
 
@@ -1028,7 +1029,8 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-content-received (session params)
   "Handle the content received notification with PARAMS for SESSION."
   (let* ((role (plist-get params :role))
-         (content (plist-get params :content)))
+         (content (plist-get params :content))
+         (roots (eca--session-workspace-folders session)))
     (with-current-buffer (eca-chat--get-buffer session)
       (pcase (plist-get content :type)
         ("text" (when-let* ((text (plist-get content :text)))
@@ -1105,7 +1107,7 @@ If FORCE? decide to OPEN? or not."
                               (concat (eca-chat--file-change-details-label details)
                                       eca-chat-mcp-tool-call-loading-symbol
                                       approvalText)
-                              (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff)))
+                              (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
                            (eca-chat--update-expandable-content
                             id
                             (concat (propertize (format "Calling %s tool: "
@@ -1126,7 +1128,7 @@ If FORCE? decide to OPEN? or not."
                                    id
                                    (concat (eca-chat--file-change-details-label details)
                                            eca-chat-mcp-tool-call-error-symbol)
-                                   (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff)))
+                                   (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
                                 (eca-chat--update-expandable-content
                                  id
                                  (concat (propertize (format "Rejected %s tool: "
@@ -1154,7 +1156,7 @@ If FORCE? decide to OPEN? or not."
                              id
                              (concat (eca-chat--file-change-details-label details)
                                      status-icon)
-                             (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff)))
+                             (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
                           (eca-chat--update-expandable-content
                            id
                            (concat (propertize (format "Called %s tool: "
