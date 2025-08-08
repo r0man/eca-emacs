@@ -76,11 +76,17 @@
   ;; Default model to use in the chat returned by server.
   (chat-default-model nil)
 
+  ;; Model to use in the chat selected by user after session started.
+  (chat-selected-model nil)
+
   ;; The supported chat behaviors by the server.
   (chat-behaviors nil)
 
   ;; Default behavior to use in the chat returned by server.
   (chat-default-behavior nil)
+
+  ;; Behavior to use in the chat selected by user after session started.
+  (chat-selected-behavior nil)
 
   ;; The welcome message for new chats.
   (chat-welcome-message ""))

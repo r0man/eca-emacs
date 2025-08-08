@@ -307,11 +307,13 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defun eca-chat--behavior (session)
   "The chat behavior considering what's in SESSION and user option."
   (or eca-chat-custom-behavior
+      (eca--session-chat-selected-behavior session)
       (eca--session-chat-default-behavior session)))
 
 (defun eca-chat--model (session)
   "The chat model considering what's in SESSION and user option."
   (or eca-chat-custom-model
+      (eca--session-chat-selected-model session)
       (eca--session-chat-default-model session)))
 
 (defun eca-chat--mcps-summary (session)
@@ -1228,7 +1230,7 @@ If FORCE? decide to OPEN? or not."
   (interactive)
   (eca-assert-session-running (eca-session))
   (when-let* ((model (completing-read "Select a model:" (append (eca--session-models (eca-session)) nil) nil t)))
-    (setq eca-chat-custom-model model)))
+    (setf (eca--session-chat-selected-model (eca-session)) model)))
 
 ;;;###autoload
 (defun eca-chat-select-behavior ()
@@ -1236,7 +1238,7 @@ If FORCE? decide to OPEN? or not."
   (interactive)
   (eca-assert-session-running (eca-session))
   (when-let* ((behavior (completing-read "Select a behavior:" (append (eca--session-chat-behaviors (eca-session)) nil) nil t)))
-    (setq eca-chat-custom-behavior behavior)))
+    (setf (eca--session-chat-selected-behavior (eca-session)) behavior)))
 
 ;;;###autoload
 (defun eca-chat-reset ()
