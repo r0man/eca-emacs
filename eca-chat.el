@@ -697,7 +697,7 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
     (let* ((context-start (eca-chat--prompt-area-start-point))
            (start-point (1- context-start)))
       (goto-char start-point)
-      (insert "\n")
+      (unless (bolp) (insert "\n"))
       (let ((ov-label (make-overlay (point) (point) (current-buffer))))
         (overlay-put ov-label 'eca-chat--expandable-content-id id)
         (overlay-put ov-label 'eca-chat--expandable-content-toggle nil)
