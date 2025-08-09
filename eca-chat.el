@@ -706,7 +706,8 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
                                       (define-key km (kbd "<mouse-1>") (lambda () (eca-chat--expandable-content-toggle id)))
                                       (define-key km (kbd "<tab>") (lambda () (eca-chat--expandable-content-toggle id)))
                                       km)
-                            'line-prefix eca-chat-expandable-block-open-symbol
+                            'line-prefix (unless (string-empty-p content)
+                                           eca-chat-expandable-block-open-symbol)
                             'help-echo "mouse-1 / tab / RET: expand/collapse"))
         (insert "\n")
         (let* ((start-point (point))
@@ -729,9 +730,10 @@ Applies LABEL-FACE to label and CONTENT-FACE to content."
         (goto-char (overlay-start ov-label))
         (delete-region (point) (1- (overlay-start ov-content)))
         (insert (propertize label
-                            'line-prefix (if open?
-                                             eca-chat-expandable-block-close-symbol
-                                           eca-chat-expandable-block-open-symbol)
+                            'line-prefix (unless (string-empty-p new-content)
+                                           (if open?
+                                               eca-chat-expandable-block-close-symbol
+                                             eca-chat-expandable-block-open-symbol))
                             'help-echo "mouse-1 / RET / tab: expand/collapse"))
         (when open?
           (delete-region (overlay-start ov-content) (overlay-end ov-content))
@@ -744,16 +746,18 @@ If FORCE? decide to OPEN? or not."
   (when-let* ((ov-label (-first (-lambda (ov) (string= id (overlay-get ov 'eca-chat--expandable-content-id)))
                                 (overlays-in (point-min) (point-max)))))
     (let* ((ov-content (overlay-get ov-label 'eca-chat--expandable-content-ov-content))
+           (content (overlay-get ov-content 'eca-chat--expandable-content-content))
+           (empty-content? (string-empty-p content))
            (open? (if force?
                       open?
-                    (overlay-get ov-label 'eca-chat--expandable-content-toggle)))
-           (content (overlay-get ov-content 'eca-chat--expandable-content-content)))
+                    (overlay-get ov-label 'eca-chat--expandable-content-toggle))))
       (save-excursion
         (goto-char (overlay-start ov-label))
-        (if open?
+        (if (or open? empty-content?)
             (progn
               (put-text-property (point) (line-end-position)
-                                 'line-prefix eca-chat-expandable-block-open-symbol)
+                                 'line-prefix (unless empty-content?
+                                                eca-chat-expandable-block-open-symbol))
               (goto-char (1+ (line-end-position)))
               (delete-region (overlay-start ov-content) (overlay-end ov-content))
               (overlay-put ov-label 'eca-chat--expandable-content-toggle nil))
