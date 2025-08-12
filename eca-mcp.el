@@ -40,7 +40,7 @@
 
 ;; Internal
 
-(declare-function eca)
+(declare-function eca "eca.el")
 
 (defvar eca-mcp-details-mode-map
   (let ((map (make-sparse-keymap)))
