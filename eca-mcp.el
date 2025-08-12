@@ -40,6 +40,14 @@
 
 ;; Internal
 
+(declare-function eca)
+
+(defvar eca-mcp-details-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-,") #'eca)
+    map)
+  "Keymap used by `eca-mcp-details-mode'.")
+
 (defun eca-mcp-details-buffer-name (session)
   "Return the chat buffer name for SESSION."
   (format  "<eca-mcp-details:%s>" (eca--session-id session)))
@@ -114,7 +122,8 @@
 ;; Public
 
 (define-derived-mode eca-mcp-details-mode fundamental-mode "eca-mcp-details"
-  "Major mode for ECA mcp details."
+  "Major mode for ECA mcp details.
+\\{eca-mcp-details-mode-map}"
   :group 'eca
   (visual-line-mode)
   (eca-mcp--refresh-server-details (eca-session)))

@@ -276,6 +276,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "C-c C-l") #'eca-chat-clear)
     (define-key map (kbd "C-c C-t") #'eca-chat-talk)
     (define-key map (kbd "C-c C-b") #'eca-chat-select-behavior)
+    (define-key map (kbd "C-c C-m") #'eca-chat-select-model)
+    (define-key map (kbd "C-c C-,") #'eca-mcp-details)
     (define-key map (kbd "C-c C-<up>") #'eca-chat-go-to-prev-user-message)
     (define-key map (kbd "C-c C-<down>") #'eca-chat-go-to-next-user-message)
     (define-key map (kbd "C-c <up>") #'eca-chat-go-to-prev-expandable-block)

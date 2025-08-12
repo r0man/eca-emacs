@@ -84,16 +84,20 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 
 | Feature                         | key                                |
 |---------------------------------|------------------------------------|
-| Chat: clear                     | <kbd>C-c</kbd> <kbd>C-l</kbd>        |
-| Chat: reset                     | <kbd>C-c</kbd> <kbd>C-k</kbd>        |
-| Chat: talk                      | <kbd>C-c</kbd> <kbd>C-t</kbd>        |
+| Chat: clear                     | <kbd>C-c</kbd> <kbd>C-l</kbd>      |
+| Chat: reset                     | <kbd>C-c</kbd> <kbd>C-k</kbd>      |
+| Chat: talk                      | <kbd>C-c</kbd> <kbd>C-t</kbd>      |
+| Chat: Select behavior           | <kbd>C-c</kbd> <kbd>C-b</kbd>      |
+| Chat: Select model              | <kbd>C-c</kbd> <kbd>C-m</kbd>      |
+| Chat: Go to MCP details         | <kbd>C-c</kbd> <kbd>C-,</kbd>      |
 | Chat: prev prompt history       | <kbd>C-&uarr;</kbd>                |
 | Chat: next prompt history       | <kbd>C-&darr;</kbd>                |
 | Chat: go to prev block          | <kbd>C-c</kbd> <kbd>&uarr;</kbd>   |
 | Chat: go to next block          | <kbd>C-c</kbd> <kbd>&darr;</kbd>   |
 | Chat: go to prev user msg       | <kbd>C-c</kbd> <kbd>C-&uarr;</kbd> |
 | Chat: go to next user msg       | <kbd>C-c</kbd> <kbd>C-&darr;</kbd> |
-| Chat: toggle expandable content | <kbd>C-c</kbd> <kbd>Tab</kbd> |
+| Chat: toggle expandable content | <kbd>C-c</kbd> <kbd>Tab</kbd>      |
+| MCP: Go to chat                 | <kbd>C-c</kbd> <kbd>C-,</kbd>      |
 
 ### Troubleshooting
 
