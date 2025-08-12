@@ -40,11 +40,11 @@
 
 ;; Internal
 
-(declare-function eca "eca.el")
+(declare-function eca "eca.el" args)
 
 (defvar eca-mcp-details-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-,") #'eca)
+    (define-key map (kbd "C-c C-,") (lambda () (interactive) (eca)))
     map)
   "Keymap used by `eca-mcp-details-mode'.")
 
