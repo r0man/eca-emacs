@@ -73,6 +73,8 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 
 - `eca-chat-add-context-at-point`: Add the current function or selected lines to chat as context.
 - `eca-chat-add-file-context`: Add the current file to chat as context.
+- `eca-keep-all-suggested-changes`: Accept planned edit changes on file.
+- `eca-discard-all-suggested-changes`: Reject planned edit changes on file.
 
 ### Variables 
 

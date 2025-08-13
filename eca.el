@@ -20,6 +20,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'smerge-mode)
 
 (require 'eca-util)
 (require 'eca-process)
@@ -199,6 +200,26 @@ When ARG is current prefix, ask for workspace roots to use."
   (interactive)
   (eca-assert-session-running (eca-session))
   (eca-info "Workspaces: %s" (eca--session-workspace-folders (eca-session))))
+
+;;;###autoload
+(defun eca-keep-all-suggested-changes ()
+  "Keep all of the ECA file change suggestion."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (ignore-errors (funcall #'smerge-keep-lower))
+    (while (ignore-errors (not (smerge-next)))
+      (funcall #'smerge-keep-lower))))
+
+;;;###autoload
+(defun eca-discard-all-suggested-changes ()
+  "Discard all of the ECA file change suggestion."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (ignore-errors (funcall #'smerge-keep-upper))
+    (while (ignore-errors (not (smerge-next)))
+      (funcall #'smerge-keep-upper))))
 
 (provide 'eca)
 ;;; eca.el ends here
