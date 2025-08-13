@@ -950,13 +950,14 @@ If FORCE? decide to OPEN? or not."
                               (overlays-in range-min range-max))))
         (goto-char (overlay-start ov))))))
 
-(defun eca-chat--track-context-at-point ()
+(defun eca-chat--track-context-at-point (&rest _args)
   "Change chat context considering current open file and point."
   (when eca-chat-auto-track-context
     (when-let ((session (eca-session)))
-      (when (--any? (and (buffer-file-name)
-                         (f-child-of? (buffer-file-name) it))
-                    (eca--session-workspace-folders session))
+      (when (-some->> (eca--session-workspace-folders session)
+              (--any? (and it
+                           (buffer-file-name)
+                           (f-child-of? (buffer-file-name) it))))
         (let ((path (buffer-file-name)))
           (with-current-buffer (eca-chat--get-buffer session)
             (when eca-chat--empty
