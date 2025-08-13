@@ -288,7 +288,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     ("b" "Change behavior" eca-chat-select-behavior)]
 
    ["Info"
-    ("m" "MCP details" eca-mcp-details)
+    ("M" "MCP details" eca-mcp-details)
     ("E" "Show stderr" eca-show-stderr)]
 
    ["Server"
