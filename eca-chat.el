@@ -65,6 +65,16 @@ ECA chat opens in a regular buffer that follows standard
   :type 'boolean
   :group 'eca)
 
+(defcustom eca-chat-auto-track-context t
+  "Whether to auto track open workspace files and add them to context."
+  :type 'boolean
+  :group 'eca)
+
+(defcustom eca-chat-cursor-context-debounce 0.5
+  "Seconds to debounce updates when tracking cursor to context."
+  :type 'number
+  :group 'eca)
+
 (defcustom eca-chat-prompt-prefix "> "
   "The prompt prefix string used in eca chat buffer."
   :type 'string
@@ -248,6 +258,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--id nil)
 (defvar-local eca-chat--last-request-id 0)
 (defvar-local eca-chat--context '())
+(defvar-local eca-chat--context-ids '())
 (defvar-local eca-chat--spinner-string "")
 (defvar-local eca-chat--spinner-timer nil)
 (defvar-local eca-chat--progress-text "")
@@ -258,6 +269,10 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defvar-local eca-chat--message-input-tokens nil)
 (defvar-local eca-chat--message-output-tokens nil)
 (defvar-local eca-chat--session-tokens nil)
+(defvar-local eca-chat--empty t)
+
+;; Timer used to debounce post-command driven context updates
+(defvar eca-chat--cursor-context-timer nil)
 
 (defun eca-chat-buffer-name (session)
   "Return the chat buffer name for SESSION."
@@ -877,6 +892,18 @@ If FORCE? decide to OPEN? or not."
   (add-to-list 'eca-chat--context context t)
   (eca-chat--refresh-context))
 
+(defun eca-chat--remove-context (context)
+  "Remove from chat CONTEXT."
+  (setq eca-chat--context (remove context eca-chat--context))
+  (eca-chat--refresh-context))
+
+(defun eca-chat--set-context (id context)
+  "Add to chat CONTEXT if ID not present, otherwise update."
+  (when-let ((existing-context (eca-get eca-chat--context-ids id)))
+    (eca-chat--remove-context existing-context))
+  (setq eca-chat--context-ids (eca-assoc eca-chat--context-ids id context))
+  (eca-chat--add-context context))
+
 (defun eca-chat--completion-context-annotate (roots item-label)
   "Annonate ITEM-LABEL detail for ROOTS."
   (-let (((&plist :type type :path path :description description) (get-text-property 0 'eca-chat-completion-item item-label)))
@@ -922,6 +949,28 @@ If FORCE? decide to OPEN? or not."
       (when-let ((ov (funcall get-fn (-lambda (ov) (overlay-get ov ov-key))
                               (overlays-in range-min range-max))))
         (goto-char (overlay-start ov))))))
+
+(defun eca-chat--track-context-at-point ()
+  "Change chat context considering current open file and point."
+  (when eca-chat-auto-track-context
+    (when-let ((session (eca-session)))
+      (when (--any? (and (buffer-file-name)
+                         (f-child-of? (buffer-file-name) it))
+                    (eca--session-workspace-folders session))
+        (let ((path (buffer-file-name)))
+          (with-current-buffer (eca-chat--get-buffer session)
+            (when eca-chat--empty
+              (eca-chat--set-context 'open-file (list :type "file"
+                                                      :path path)))))))))
+
+(defun eca-chat--post-command-schedule ()
+  "Debounce `eca-chat--track-context-at-point' via an idle timer."
+  (when eca-chat--cursor-context-timer
+    (cancel-timer eca-chat--cursor-context-timer)
+    (setq eca-chat--cursor-context-timer nil))
+  (setq eca-chat--cursor-context-timer
+        (run-with-idle-timer eca-chat-cursor-context-debounce nil
+                             #'eca-chat--track-context-at-point)))
 
 ;; Public
 
@@ -1041,6 +1090,7 @@ If FORCE? decide to OPEN? or not."
          (content (plist-get params :content))
          (roots (eca--session-workspace-folders session)))
     (with-current-buffer (eca-chat--get-buffer session)
+      (setq-local eca-chat--empty nil)
       (pcase (plist-get content :type)
         ("text" (when-let* ((text (plist-get content :text)))
                   (pcase role
@@ -1213,7 +1263,9 @@ If FORCE? decide to OPEN? or not."
     (unless (derived-mode-p 'eca-chat-mode)
       (eca-chat-mode)
       (when eca-chat-auto-add-repomap
-        (eca-chat--add-context (list :type "repoMap"))))
+        (eca-chat--add-context (list :type "repoMap")))
+      (when eca-chat-auto-track-context
+        (add-hook 'post-command-hook #'eca-chat--post-command-schedule)))
     (unless (eca--session-chat session)
       (setf (eca--session-chat session) (current-buffer)))
     (if (window-live-p (get-buffer-window (buffer-name)))
@@ -1266,6 +1318,7 @@ If FORCE? decide to OPEN? or not."
     (setq-local eca-chat--session-tokens nil)
     (setq-local eca-chat--message-cost nil)
     (setq-local eca-chat--session-cost nil)
+    (setq-local eca-chat--empty t)
     (eca-chat--clear (eca-session))))
 
 ;;;###autoload
