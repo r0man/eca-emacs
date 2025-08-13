@@ -14,7 +14,7 @@ For more details about ECA, check [ECA server](https://github.com/editor-code-as
 
 - Emacs 28.1 or later
 
-### Optional 
+### Optional
 
 - Custom `eca` server binary, it's automatically downloaded if `eca-custom-command` is `nil`
   - Place it on your `$PATH` or customize `eca-custom-command`
@@ -53,11 +53,16 @@ M-x package-install eca
 - `eca-keep-all-suggested-changes`: Accept planned edit changes on file.
 - `eca-discard-all-suggested-changes`: Reject planned edit changes on file.
 
-### Variables 
+### Variables
 
 - `eca-extra-args`: customize extra args to server to help debug like `("--verbose")` or `("--log-level" "debug")`.
 - `eca-chat-usage-string-format`: to customize what shows on mode-line for usage like costs and tokens.
 - `eca-chat-position-params`: customize the chat window.
+
+
+### Quck access to common commands
+
+You can access transient menu with commonly commands via `M-x eca-transient-menu` or by pressing `C-c .` in the chat buffer.
 
 ### Keybindings
 
