@@ -44,29 +44,6 @@ M-x package-install eca
 3. Type your prompt after the `> ` and press RET.
 4. Attach more context auto completing after the `@`.
 
-## Usage
-
-### Speech-to-Text support
-
-If you have [whisper.el](https://github.com/natrys/whisper.el/blob/master/whisper.el) installed you can use the `eca-chat-talk`
-command (or use the `C-t` keybinding) to talk to the Editor Code
-Assistant. This will record audio until you press `RET`. Then, the
-recorded audio will be transcribed to text and placed into the chat
-buffer.
-
-We recommend to use the `small`, it is a good trade-off between
-accuracy and transcription speed.
-
-```elisp
-(use-package whisper
-  :custom
-  (whisper-model "small"))
-```
-
-### Custom workspaces
-
-Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the process.
-
 ## Tips
 
 ### Functions
@@ -100,6 +77,30 @@ Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the pr
 | Chat: go to next user msg       | <kbd>C-c</kbd> <kbd>C-&darr;</kbd> |
 | Chat: toggle expandable content | <kbd>C-c</kbd> <kbd>Tab</kbd>      |
 | MCP: Go to chat                 | <kbd>C-c</kbd> <kbd>C-,</kbd>      |
+
+## Advanced Usage
+
+### Speech-to-Text support
+
+If you have [whisper.el](https://github.com/natrys/whisper.el/blob/master/whisper.el) installed you can use the `eca-chat-talk`
+command (or use the `C-t` keybinding) to talk to the Editor Code
+Assistant. This will record audio until you press `RET`. Then, the
+recorded audio will be transcribed to text and placed into the chat
+buffer.
+
+We recommend to use the `small`, it is a good trade-off between
+accuracy and transcription speed.
+
+```elisp
+(use-package whisper
+  :custom
+  (whisper-model "small"))
+```
+
+### Custom workspaces
+
+Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the process.
+
 
 ### Troubleshooting
 
