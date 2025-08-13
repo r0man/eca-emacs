@@ -221,5 +221,23 @@ When ARG is current prefix, ask for workspace roots to use."
     (while (ignore-errors (not (smerge-next)))
       (funcall #'smerge-keep-upper))))
 
+;;; ###autoload
+(transient-define-prefix eca-transient-menu
+  ()
+  "ECA transient menu"
+  [["Chat"
+    ("c" "Clear" eca-chat-clear)
+    ("r" "Reset" eca-chat-reset)
+    ("m" "Select model" eca-chat-select-model)
+    ("b" "Change behavior" eca-chat-select-behavior)]
+
+   ["Info"
+    ("m" "MCP details" eca-mcp-details)
+    ("E" "Show stderr" eca-show-stderr)]
+
+   ["Server"
+    ("R" "Stop" eca-restart)
+    ("S" "Stop" eca-stop)]])
+
 (provide 'eca)
 ;;; eca.el ends here
