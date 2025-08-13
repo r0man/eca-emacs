@@ -14,7 +14,7 @@
 (require 'f)
 (require 'markdown-mode)
 (require 'compat)
-
+(require 'transient)
 (require 'eca-util)
 (require 'eca-api)
 (require 'eca-mcp)
@@ -278,6 +278,23 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
   "Return the chat buffer name for SESSION."
   (format "<eca-chat:%s>" (eca--session-id session)))
 
+(transient-define-prefix eca-transient-menu
+  ()
+  "ECA transient menu"
+  [["Chat"
+    ("c" "Clear" eca-chat-clear)
+    ("r" "Reset" eca-chat-reset)
+    ("m" "Select model" eca-chat-select-model)
+    ("b" "Change behavior" eca-chat-select-behavior)]
+
+   ["Info"
+    ("m" "MCP details" eca-mcp-details)
+    ("E" "Show stderr" eca-show-stderr)]
+
+   ["Server"
+    ("R" "Stop" eca-restart)
+    ("S" "Stop" eca-stop)]])
+
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<backspace>") #'eca-chat--key-pressed-backspace)
@@ -292,6 +309,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     (define-key map (kbd "C-c C-t") #'eca-chat-talk)
     (define-key map (kbd "C-c C-b") #'eca-chat-select-behavior)
     (define-key map (kbd "C-c C-m") #'eca-chat-select-model)
+    (define-key map (kbd "C-c .") #'eca-transient-menu)
     (define-key map (kbd "C-c C-,") (lambda () (interactive) (eca-mcp-details)))
     (define-key map (kbd "C-c C-<up>") #'eca-chat-go-to-prev-user-message)
     (define-key map (kbd "C-c C-<down>") #'eca-chat-go-to-next-user-message)
