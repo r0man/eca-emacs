@@ -972,15 +972,14 @@ If FORCE? decide to OPEN? or not."
   "Change chat context considering current open file and point."
   (when eca-chat-auto-track-context
     (when-let ((session (eca-session)))
-      (when (-some->> (eca--session-workspace-folders session)
-              (--any? (and it
-                           (buffer-file-name)
-                           (f-child-of? (buffer-file-name) it))))
-        (let ((path (buffer-file-name)))
-          (with-current-buffer (eca-chat--get-buffer session)
-            (when eca-chat--empty
-              (eca-chat--set-context 'open-file (list :type "file"
-                                                      :path path)))))))))
+      (when-let ((workspaces (eca--session-workspace-folders session)))
+        (when-let ((path (buffer-file-name)))
+          (when (--any? (and it (f-ancestor-of? it path))
+                        workspaces)
+            (with-current-buffer (eca-chat--get-buffer session)
+              (when eca-chat--empty
+                (eca-chat--set-context 'open-file (list :type "file"
+                                                        :path path))))))))))
 
 (defun eca-chat--post-command-schedule ()
   "Debounce `eca-chat--track-context-at-point' via an idle timer."
