@@ -970,16 +970,18 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--track-context-at-point (&rest _args)
   "Change chat context considering current open file and point."
-  (when eca-chat-auto-track-context
-    (when-let ((session (eca-session)))
-      (when-let ((workspaces (eca--session-workspace-folders session)))
-        (when-let ((path (buffer-file-name)))
-          (when (--any? (and it (f-ancestor-of? it path))
-                        workspaces)
-            (with-current-buffer (eca-chat--get-buffer session)
-              (when eca-chat--empty
-                (eca-chat--set-context 'open-file (list :type "file"
-                                                        :path path))))))))))
+  (condition-case _err
+      (when eca-chat-auto-track-context
+        (when-let ((session (eca-session)))
+          (when-let ((workspaces (eca--session-workspace-folders session)))
+            (when-let ((path (buffer-file-name)))
+              (when (--any? (and it (f-ancestor-of? it path))
+                            workspaces)
+                (with-current-buffer (eca-chat--get-buffer session)
+                  (when eca-chat--empty
+                    (eca-chat--set-context 'open-file (list :type "file"
+                                                            :path path)))))))))
+    (error nil)))
 
 (defun eca-chat--post-command-schedule ()
   "Debounce `eca-chat--track-context-at-point' via an idle timer."
