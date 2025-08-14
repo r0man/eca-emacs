@@ -1277,20 +1277,23 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-open (session)
   "Open or create dedicated eca chat window for SESSION."
   (eca-assert-session-running session)
-  (unless (buffer-live-p (eca-chat--get-buffer session))
-    (eca-chat--create-buffer session))
-  (with-current-buffer (eca-chat--get-buffer session)
-    (unless (derived-mode-p 'eca-chat-mode)
-      (eca-chat-mode)
-      (when eca-chat-auto-add-repomap
-        (eca-chat--add-context (list :type "repoMap")))
-      (when eca-chat-auto-track-context
-        (add-hook 'post-command-hook #'eca-chat--post-command-schedule)))
-    (unless (eca--session-chat session)
-      (setf (eca--session-chat session) (current-buffer)))
-    (if (window-live-p (get-buffer-window (buffer-name)))
-        (eca-chat--select-window)
-      (eca-chat--pop-window))))
+  (let ((opened-buffer (current-buffer)))
+    (unless (buffer-live-p (eca-chat--get-buffer session))
+      (eca-chat--create-buffer session))
+    (with-current-buffer (eca-chat--get-buffer session)
+      (unless (derived-mode-p 'eca-chat-mode)
+        (eca-chat-mode)
+        (when eca-chat-auto-add-repomap
+          (eca-chat--add-context (list :type "repoMap")))
+        (when eca-chat-auto-track-context
+          (add-hook 'post-command-hook #'eca-chat--post-command-schedule)
+          (with-current-buffer opened-buffer
+            (eca-chat--track-context-at-point))))
+      (unless (eca--session-chat session)
+        (setf (eca--session-chat session) (current-buffer)))
+      (if (window-live-p (get-buffer-window (buffer-name)))
+          (eca-chat--select-window)
+        (eca-chat--pop-window)))))
 
 (defun eca-chat-exit (session)
   "Exit the ECA chat for SESSION."
