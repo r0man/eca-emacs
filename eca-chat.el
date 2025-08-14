@@ -516,10 +516,17 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 
      ((and cur-ov
            (overlay-get cur-ov 'eca-chat-context-area)
-           (or (string= " " (string (char-before (point))))
-               (string= eca-chat-context-prefix (string (char-before (point))))))
-      ;; trying to remove a space or context-prefix
+           (and (string= " " (string (char-before (point))))
+                (not (eolp))))
+      ;; trying to remove a context space separator
       )
+
+     ((and cur-ov
+           (overlay-get cur-ov 'eca-chat-context-area)
+           (string= eca-chat-context-prefix (string (char-before (point)))))
+      (setq-local eca-chat--context (delete (car (last eca-chat--context)) eca-chat--context))
+      (eca-chat--refresh-context)
+      (end-of-line))
 
      (t (delete-char -1)))))
 
