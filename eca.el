@@ -93,17 +93,20 @@
   "Handle raw message JSON-DATA for SESSION."
   (let ((id (plist-get json-data :id))
         (result (plist-get json-data :result)))
-    (pcase (eca--get-message-type json-data)
-      ('response (-let [(success-callback) (plist-get (eca--session-response-handlers session) id)]
-                   (when success-callback
-                     (cl-remf (eca--session-response-handlers session) id)
-                     (funcall success-callback result))))
-      ('response-error (-let [(_ error-callback) (plist-get (eca--session-response-handlers session) id)]
-                         (when error-callback
-                           (cl-remf (eca--session-response-handlers session) id)
-                           (funcall error-callback (plist-get json-data :error)))))
-      ('notification (eca--handle-server-notification session json-data))
-      ('request (eca--handle-server-request session json-data)))))
+    (condition-case err
+        (pcase (eca--get-message-type json-data)
+          ('response (-let [(success-callback) (plist-get (eca--session-response-handlers session) id)]
+                       (when success-callback
+                         (cl-remf (eca--session-response-handlers session) id)
+                         (funcall success-callback result))))
+          ('response-error (-let [(_ error-callback) (plist-get (eca--session-response-handlers session) id)]
+                             (when error-callback
+                               (cl-remf (eca--session-response-handlers session) id)
+                               (funcall error-callback (plist-get json-data :error)))))
+          ('notification (eca--handle-server-notification session json-data))
+          ('request (eca--handle-server-request session json-data)))
+      ;; TODO handle errors
+      (error nil))))
 
 (defun eca--initialize (session)
   "Send the initialize request for SESSION."

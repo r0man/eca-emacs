@@ -1069,25 +1069,29 @@ If FORCE? decide to OPEN? or not."
                              (cl-first (bounds-of-thing-at-point 'symbol))
                              (point)))))
          (candidates-fn (lambda ()
-                          (pcase type
-                            ('contexts
-                             (-let (((&plist :contexts contexts) (eca-api-request-sync
-                                                                  (eca-session)
-                                                                  :method "chat/queryContext"
-                                                                  :params (list :chatId eca-chat--id
-                                                                                :query (thing-at-point 'symbol t)
-                                                                                :contexts (vconcat eca-chat--context)))))
-                               (-map #'eca-chat--context-to-completion contexts)))
+                          (eca-api-catch 'input
+                              (eca-api-while-no-input
+                                (pcase type
+                                  ('contexts
+                                   (-let (((&plist :contexts contexts) (eca-api-request-while-no-input
+                                                                        (eca-session)
+                                                                        :method "chat/queryContext"
+                                                                        :params (list :chatId eca-chat--id
+                                                                                      :query (thing-at-point 'symbol t)
+                                                                                      :contexts (vconcat eca-chat--context)))))
+                                     (-map #'eca-chat--context-to-completion contexts)))
 
-                            ('prompts
-                             (-let (((&plist :commands commands) (eca-api-request-sync
-                                                                  (eca-session)
-                                                                  :method "chat/queryCommands"
-                                                                  :params (list :chatId eca-chat--id
-                                                                                :query (substring full-text 1)))))
-                               (-map #'eca-chat--command-to-completion commands)))
+                                  ('prompts
+                                   (-let (((&plist :commands commands) (eca-api-request-while-no-input
+                                                                        (eca-session)
+                                                                        :method "chat/queryCommands"
+                                                                        :params (list :chatId eca-chat--id
+                                                                                      :query (substring full-text 1)))))
+                                     (-map #'eca-chat--command-to-completion commands)))
 
-                            (_ nil))))
+                                  (_ nil)))
+                            (:interrupted nil)
+                            (`,res res))))
          (exit-fn (pcase type
                     ('contexts #'eca-chat--completion-context-exit-function)
                     (_ nil)))
