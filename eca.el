@@ -93,7 +93,7 @@
   "Handle raw message JSON-DATA for SESSION."
   (let ((id (plist-get json-data :id))
         (result (plist-get json-data :result)))
-    (condition-case err
+    (condition-case _err
         (pcase (eca--get-message-type json-data)
           ('response (-let [(success-callback) (plist-get (eca--session-response-handlers session) id)]
                        (when success-callback
