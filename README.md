@@ -60,11 +60,11 @@ M-x package-install eca
 - `eca-chat-position-params`: customize the chat window.
 
 
-### Quck access to common commands
-
-You can access transient menu with commonly commands via `M-x eca-transient-menu` or by pressing `C-c .` in the chat buffer.
-
 ### Keybindings
+
+You can access __transient___ menu with commonly commands via `M-x eca-transient-menu` or by pressing `C-c .` in eca's windows.
+
+#### Manual keybindings
 
 | Feature                         | key                                |
 |---------------------------------|------------------------------------|
@@ -85,7 +85,7 @@ You can access transient menu with commonly commands via `M-x eca-transient-menu
 
 ## Advanced Usage
 
-### Speech-to-Text support
+### Speech-to-Text support (Talk)
 
 If you have [whisper.el](https://github.com/natrys/whisper.el/blob/master/whisper.el) installed you can use the `eca-chat-talk`
 command (or use the `C-t` keybinding) to talk to the Editor Code
@@ -106,8 +106,7 @@ accuracy and transcription speed.
 
 Calling `M-x eca` with prefix `C-u` will ask for what workspaces to start the process.
 
-
-### Troubleshooting
+## Troubleshooting
 
 #### Environment Variables Not Available (macOS/Linux GUI)
 

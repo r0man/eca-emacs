@@ -14,6 +14,7 @@
 (require 'cl-lib)
 (require 'vc-git)
 (require 'dash)
+(require 'transient)
 
 (defun eca-assoc (map key val)
   "Return a new MAP with KEY associated to flat plist VAL, replacing any existing."
@@ -151,6 +152,25 @@
                 'eca-button-on-action callback
                 'pointer 'hand
                 'keymap km)))
+
+(transient-define-prefix eca-transient-menu
+  ()
+  "ECA transient menu"
+  [["Chat"
+    ("c" "Clear" eca-chat-clear)
+    ("r" "Reset" eca-chat-reset)
+    ("t" "Talk" eca-chat-talk)
+    ("m" "Select model" eca-chat-select-model)
+    ("b" "Change behavior" eca-chat-select-behavior)]
+
+   ["Navigation"
+    ("C" "Chat" eca)
+    ("M" "MCP details" eca-mcp-details)
+    ("E" "Show stderr (logs)" eca-show-stderr)]
+
+   ["Server"
+    ("R" "Stop" eca-restart)
+    ("S" "Stop" eca-stop)]])
 
 (provide 'eca-util)
 ;;; eca-util.el ends here

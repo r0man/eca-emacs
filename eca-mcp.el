@@ -45,6 +45,7 @@
 (defvar eca-mcp-details-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-,") (lambda () (interactive) (eca)))
+    (define-key map (kbd "C-c .") #'eca-transient-menu)
     map)
   "Keymap used by `eca-mcp-details-mode'.")
 

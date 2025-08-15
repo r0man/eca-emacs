@@ -14,7 +14,7 @@
 (require 'f)
 (require 'markdown-mode)
 (require 'compat)
-(require 'transient)
+
 (require 'eca-util)
 (require 'eca-api)
 (require 'eca-mcp)
@@ -277,23 +277,6 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defun eca-chat-buffer-name (session)
   "Return the chat buffer name for SESSION."
   (format "<eca-chat:%s>" (eca--session-id session)))
-
-(transient-define-prefix eca-transient-menu
-  ()
-  "ECA transient menu"
-  [["Chat"
-    ("c" "Clear" eca-chat-clear)
-    ("r" "Reset" eca-chat-reset)
-    ("m" "Select model" eca-chat-select-model)
-    ("b" "Change behavior" eca-chat-select-behavior)]
-
-   ["Info"
-    ("M" "MCP details" eca-mcp-details)
-    ("E" "Show stderr" eca-show-stderr)]
-
-   ["Server"
-    ("R" "Stop" eca-restart)
-    ("S" "Stop" eca-stop)]])
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
