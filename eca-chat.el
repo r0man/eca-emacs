@@ -31,9 +31,9 @@
 Can be `'left', `'right', `'top', or `'bottom'.  This setting will only
 be used when `eca-chat-use-side-window' is non-nil."
   :type '(choice (const :tag "Left" left)
-                 (const :tag "Right" right)
-                 (const :tag "Top" top)
-                 (const :tag "Bottom" bottom))
+          (const :tag "Right" right)
+          (const :tag "Top" top)
+          (const :tag "Bottom" bottom))
   :group 'eca)
 
 (defcustom eca-chat-window-width 0.40
@@ -302,10 +302,25 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
     map)
   "Keymap used by `eca-chat-mode'.")
 
+(defun eca-chat--get-buffer (session)
+  "Get the eca chat buffer for SESSION."
+  (get-buffer (eca-chat-buffer-name session)))
+
+(defun eca-chat--create-buffer (session)
+  "Create the eca chat buffer for SESSION."
+  (get-buffer-create (generate-new-buffer-name (eca-chat-buffer-name session))))
+
+(defmacro eca-chat--with-current-buffer (buffer &rest body)
+  "Eval BODY inside chat BUFFER."
+  (declare (indent 1) (debug t))
+  `(with-current-buffer ,buffer
+     (let ((inhibit-read-only t))
+       ,@body)))
+
 (defun eca-chat--spinner-start (session)
   "Start modeline spinner for SESSION."
   (setq eca-chat--spinner-timer
-        (with-current-buffer (eca-chat--get-buffer session)
+        (eca-chat--with-current-buffer (eca-chat--get-buffer session)
           (run-with-timer
            0
            0.5
@@ -371,7 +386,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defun eca-chat--clear (session)
   "Clear the chat for SESSION."
-  (with-current-buffer (eca-chat--get-buffer session)
+  (eca-chat--with-current-buffer (eca-chat--get-buffer session)
     (erase-buffer)
     (remove-overlays (point-min) (point-max))
     (insert "\n")
@@ -381,7 +396,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 (defun eca-chat--stop-prompt (session)
   "Stop the running chat prompt for SESSION."
   (when eca-chat--chat-loading
-    (with-current-buffer (eca-chat--get-buffer session)
+    (eca-chat--with-current-buffer (eca-chat--get-buffer session)
       (eca-api-notify session
                       :method "chat/promptStop"
                       :params (list :chatId eca-chat--id))
@@ -392,6 +407,7 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 Otherwise to a not loading state."
   (unless (eq eca-chat--chat-loading loading)
     (setq-local eca-chat--chat-loading loading)
+    (setq-local buffer-read-only loading)
     (let ((prompt-field-ov (eca-chat--prompt-field-ov))
           (stop-text (eca-buttonize
                       (propertize "stop" 'font-lock-face 'eca-chat-prompt-stop-face)
@@ -441,17 +457,18 @@ Otherwise to a not loading state."
 (defun eca-chat--key-pressed-tab ()
   "Expand tool call if point is at expandable content, or use default behavior."
   (interactive)
-  (cond
-   ;; expandable toggle
-   ((eca-chat--expandable-content-at-point)
-    (eca-chat--expandable-content-toggle (overlay-get (eca-chat--expandable-content-at-point) 'eca-chat--expandable-content-id)))
+  (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
+    (cond
+     ;; expandable toggle
+     ((eca-chat--expandable-content-at-point)
+      (eca-chat--expandable-content-toggle (overlay-get (eca-chat--expandable-content-at-point) 'eca-chat--expandable-content-id)))
 
-   ;; context completion
-   ((and (eca-chat--prompt-context-field-ov)
-         (eolp))
-    (completion-at-point))
+     ;; context completion
+     ((and (eca-chat--prompt-context-field-ov)
+           (eolp))
+      (completion-at-point))
 
-   (t t)))
+     (t t))))
 
 (defun eca-chat--prompt-field-ov ()
   "Return the overlay for the prompt field."
@@ -516,7 +533,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
 (defun eca-chat--key-pressed-return ()
   "Send the current prompt to eca process if in prompt."
   (interactive)
-  (with-current-buffer (eca-chat--get-buffer (eca-session))
+  (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
     (let* ((prompt-start (eca-chat--prompt-field-start-point))
            (session (eca-session))
            (prompt (save-excursion
@@ -629,14 +646,6 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
      eca-chat--spinner-string
      fill-space
      usage-str)))
-
-(defun eca-chat--get-buffer (session)
-  "Get the eca chat buffer for SESSION."
-  (get-buffer (eca-chat-buffer-name session)))
-
-(defun eca-chat--create-buffer (session)
-  "Create the eca chat buffer for SESSION."
-  (get-buffer-create (generate-new-buffer-name (eca-chat-buffer-name session))))
 
 (defun eca-chat--select-window ()
   "Select the Window."
@@ -952,7 +961,7 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--go-to-overlay (ov-key range-min range-max first?)
   "Go to overlay finding from RANGE-MIN to RANGE-MAX if matches OV-KEY."
-  (with-current-buffer (eca-chat--get-buffer (eca-session))
+  (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
     (let ((get-fn (if first? #'-first #'-last)))
       (when-let ((ov (funcall get-fn (-lambda (ov) (overlay-get ov ov-key))
                               (overlays-in range-min range-max))))
@@ -967,7 +976,7 @@ If FORCE? decide to OPEN? or not."
             (when-let ((path (buffer-file-name)))
               (when (--any? (and it (f-ancestor-of? it path))
                             workspaces)
-                (with-current-buffer (eca-chat--get-buffer session)
+                (eca-chat--with-current-buffer (eca-chat--get-buffer session)
                   (when eca-chat--empty
                     (eca-chat--set-context 'open-file (list :type "file"
                                                             :path path)))))))))
@@ -1017,7 +1026,7 @@ If FORCE? decide to OPEN? or not."
      0.05
      nil
      (lambda ()
-       (with-current-buffer (eca-chat--get-buffer (eca-session))
+       (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
          (display-line-numbers-mode -1)
          (when (fboundp 'vi-tilde-fringe-mode) (vi-tilde-fringe-mode -1))
          (when (fboundp 'company-mode)
@@ -1103,7 +1112,7 @@ If FORCE? decide to OPEN? or not."
   (let* ((role (plist-get params :role))
          (content (plist-get params :content))
          (roots (eca--session-workspace-folders session)))
-    (with-current-buffer (eca-chat--get-buffer session)
+    (eca-chat--with-current-buffer (eca-chat--get-buffer session)
       (setq-local eca-chat--empty nil)
       (pcase (plist-get content :type)
         ("text" (when-let* ((text (plist-get content :text)))
@@ -1265,7 +1274,7 @@ If FORCE? decide to OPEN? or not."
 
 (defun eca-chat--handle-mcp-server-updated (session _server)
   "Handle mcp SERVER updated for SESSION."
-  (with-current-buffer (eca-chat--get-buffer session)
+  (eca-chat--with-current-buffer (eca-chat--get-buffer session)
     (force-mode-line-update)))
 
 (defun eca-chat-open (session)
@@ -1274,7 +1283,7 @@ If FORCE? decide to OPEN? or not."
   (let ((opened-buffer (current-buffer)))
     (unless (buffer-live-p (eca-chat--get-buffer session))
       (eca-chat--create-buffer session))
-    (with-current-buffer (eca-chat--get-buffer session)
+    (eca-chat--with-current-buffer (eca-chat--get-buffer session)
       (unless (derived-mode-p 'eca-chat-mode)
         (eca-chat-mode)
         (when eca-chat-auto-add-repomap
@@ -1292,7 +1301,7 @@ If FORCE? decide to OPEN? or not."
 (defun eca-chat-exit (session)
   "Exit the ECA chat for SESSION."
   (when (buffer-live-p (get-buffer (eca-chat-buffer-name session)))
-    (with-current-buffer (eca-chat--get-buffer session)
+    (eca-chat--with-current-buffer (eca-chat--get-buffer session)
       (setq eca-chat--closed t)
       (force-mode-line-update)
       (goto-char (point-max))
@@ -1371,7 +1380,7 @@ If FORCE? decide to OPEN? or not."
   "Toggle current expandable block at point."
   (interactive)
   (eca-assert-session-running (eca-session))
-  (with-current-buffer (eca-chat--get-buffer (eca-session))
+  (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
     (unless (eca-chat--expandable-content-at-point)
       (eca-chat-go-to-prev-expandable-block))
     (when-let ((ov (eca-chat--expandable-content-at-point)))
@@ -1388,7 +1397,7 @@ Consider the defun at point unless a region is selected."
                           (-let (((s . e) (bounds-of-thing-at-point 'defun)))
                             `(,(line-number-at-pos s) . ,(line-number-at-pos e)))))
          (path (buffer-file-name)))
-    (with-current-buffer (eca-chat--get-buffer (eca-session))
+    (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
       (eca-chat--add-context (list :type "file"
                                    :path path
                                    :linesRange (list :start start :end end))))))
@@ -1402,7 +1411,7 @@ if ARG is current prefix, ask for file, otherwise add current file."
   (-let ((path (if (equal arg '(4))
                    (read-file-name "Select the file to add to context: " (eca-find-root-for-buffer))
                  (buffer-file-name))))
-    (with-current-buffer (eca-chat--get-buffer (eca-session))
+    (eca-chat--with-current-buffer (eca-chat--get-buffer (eca-session))
       (eca-chat--add-context (list :type "file"
                                    :path path))
       (eca-chat-open (eca-session)))))
@@ -1418,7 +1427,7 @@ if ARG is current prefix, ask for file, otherwise add current file."
   (let ((session (eca-session)))
     (eca-assert-session-running session)
     (eca-chat-open session)
-    (with-current-buffer (eca-chat--get-buffer session)
+    (eca-chat--with-current-buffer (eca-chat--get-buffer session)
       (goto-char (point-max)))
     (let ((buffer (get-buffer-create "*whisper-stdout*")))
       (with-current-buffer buffer
@@ -1429,7 +1438,7 @@ if ARG is current prefix, ask for file, otherwise add current file."
                     (let ((transcription (buffer-substring
                                           (line-beginning-position)
                                           (line-end-position))))
-                      (with-current-buffer (eca-chat-buffer-name session)
+                      (eca-chat--with-current-buffer (eca-chat-buffer-name session)
                         (insert transcription)
                         (newline)
                         (eca-chat--key-pressed-return))))
