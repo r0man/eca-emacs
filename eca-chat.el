@@ -1157,7 +1157,6 @@ If FORCE? decide to OPEN? or not."
         ("toolCallPrepare" (let* ((name (plist-get content :name))
                                   (origin (plist-get content :origin))
                                   (argsText (plist-get content :argumentsText))
-                                  (colorizedArgsText (concat "```javascript\n" argsText "\n```"))
                                   (id (plist-get content :id))
                                   (summary (plist-get content :summary))
                                   (label (concat (propertize (or summary
@@ -1169,7 +1168,10 @@ If FORCE? decide to OPEN? or not."
                                                  eca-chat-mcp-tool-call-loading-symbol)))
                              (if (eca-chat--get-expandable-content id)
                                  (eca-chat--update-expandable-content id label colorizedArgsText)
-                               (eca-chat--add-expandable-content id label (eca-chat--content-table `(("arguments" . ,colorizedArgsText)))))))
+                               (eca-chat--add-expandable-content id
+                                                                 label
+                                                                 (eca-chat--content-table
+                                                                  `(("arguments" . ,argsText)))))))
         ("toolCallRun" (let* ((name (plist-get content :name))
                               (origin (plist-get content :origin))
                               (args (plist-get content :arguments))
