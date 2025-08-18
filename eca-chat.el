@@ -19,6 +19,8 @@
 (require 'eca-api)
 (require 'eca-mcp)
 
+(require 'evil nil t)
+
 ;; Variables
 
 (defcustom eca-chat-mode-hook '()
@@ -280,8 +282,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<backspace>") #'eca-chat--key-pressed-backspace)
-    (define-key map (kbd "DEL") #'eca-chat--key-pressed-backspace)
+    (define-key map (kbd "<backspace>") (lambda (interactive) (eca-chat--key-pressed-deletion (lambda () (delete-char -1)))))
+    (define-key map (kbd "DEL") (lambda (interactive) (eca-chat--key-pressed-deletion (lambda () (delete-char -1)))))
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "C-<up>") #'eca-chat--key-pressed-previous-prompt-history)
     (define-key map (kbd "C-<down>") #'eca-chat--key-pressed-next-prompt-history)
@@ -494,11 +496,10 @@ Otherwise to a not loading state."
   (-some-> (eca-chat--prompt-area-ov)
     (overlay-start)))
 
-(defun eca-chat--key-pressed-backspace ()
-  "Delete the character before point, unless at the prompt or context boundary.
+(defun eca-chat--key-pressed-deletion (side-effect-fn)
+  "Apply SIDE-EFFECT-FN before point, unless at the prompt or context boundary.
 Checks if it's in a context, removing it if so.
-This is similar to `backward-delete-char' but protects the prompt/context line."
-  (interactive)
+This is similar to actions like `backward-delete-char' but protects the prompt/context line."
   (let* ((cur-ov (car (overlays-in (line-beginning-position) (point))))
          (text (thing-at-point 'symbol))
          (context-item (-some->> text
@@ -528,7 +529,7 @@ This is similar to `backward-delete-char' but protects the prompt/context line."
       (eca-chat--refresh-context)
       (end-of-line))
 
-     (t (delete-char -1)))))
+     (t (funcall side-effect-fn)))))
 
 (defun eca-chat--key-pressed-return ()
   "Send the current prompt to eca process if in prompt."
@@ -1021,6 +1022,10 @@ If FORCE? decide to OPEN? or not."
         (insert (propertize (eca--session-chat-welcome-message session)
                             'font-lock-face 'eca-chat-welcome-face))
         (eca-chat--insert-prompt-string)))
+
+    (when (featurep 'evil)
+      (define-key evil-insert-state-local-map (kbd "C-w") (lambda () (interactive) (eca-chat--key-pressed-deletion (lambda () (evil-delete-backward-word)))))
+      (define-key evil-insert-state-local-map (kbd "C-u") (lambda () (interactive) (eca-chat--key-pressed-deletion (lambda () (evil-delete-back-to-indentation))))))
 
     (run-with-timer
      0.05
