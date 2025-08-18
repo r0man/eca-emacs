@@ -30,10 +30,11 @@
     (4 "hint")
     (_ "unknown")))
 
-(defun eca-editor--lsp-mode-diagnostics (uri workspace eca-diagnostics)
-  "Add to ECA-DIAGNOSTICS all lsp-mode diagnostics found for WORKSPACE.
+(defun eca-editor--lsp-mode-diagnostics (uri workspace)
+  "Find all lsp-mode diagnostics found for WORKSPACE.
 If URI is nil find all diagnostics otherwise filter to that uri."
-  (let* ((all-diagnostics (car (--keep (when (and (buffer-file-name it)
+  (let* ((eca-diagnostics '())
+         (all-diagnostics (car (--keep (when (and (buffer-file-name it)
                                                   (f-ancestor-of? workspace (buffer-file-name it)))
                                          (with-current-buffer it
                                            (lsp-diagnostics t)))
@@ -57,10 +58,11 @@ If URI is nil find all diagnostics otherwise filter to that uri."
                                       :message (gethash "message" it))
                                 eca-diagnostics))
                         lsp-diagnostics)))
-             diagnostics)))
+             diagnostics)
+    eca-diagnostics))
 
-(defun eca-editor--flymake-diagnostics (_uri _workspace _eca-diagnostics)
-  "Add to ECA-DIAGNOSTICS all flymake diagnostics found for WORKSPACE.
+(defun eca-editor--flymake-diagnostics (_uri _workspace)
+  "Find all flymake diagnostics found for WORKSPACE.
 If URI is nil find all diagnostics otherwise filter to that uri."
   ;; TODO
   )
@@ -71,8 +73,8 @@ If URI is nil, return all workspaces diagnostics."
   (let ((eca-diagnostics '()))
     (seq-doseq (workspace workspaces)
       (cond
-       ((featurep 'lsp-mode) (eca-editor--lsp-mode-diagnostics uri workspace eca-diagnostics))
-       ((featurep 'flymake) (eca-editor--flymake-diagnostics uri workspace eca-diagnostics))
+       ((featurep 'lsp-mode) (setq eca-diagnostics (append eca-diagnostics (eca-editor--lsp-mode-diagnostics uri workspace))))
+       ((featurep 'flymake) (setq eca-diagnostics (append eca-diagnostics (eca-editor--flymake-diagnostics uri workspace))))
        (t nil)))
     eca-diagnostics))
 
