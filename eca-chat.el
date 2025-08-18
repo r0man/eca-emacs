@@ -1167,7 +1167,7 @@ If FORCE? decide to OPEN? or not."
                                                  " "
                                                  eca-chat-mcp-tool-call-loading-symbol)))
                              (if (eca-chat--get-expandable-content id)
-                                 (eca-chat--update-expandable-content id label colorizedArgsText)
+                                 (eca-chat--update-expandable-content id label argsText)
                                (eca-chat--add-expandable-content id
                                                                  label
                                                                  (eca-chat--content-table
