@@ -30,8 +30,19 @@
     (4 "hint")
     (_ "unknown")))
 
+(defun eca-editor--flymake-to-eca-severity (severity)
+  "Convert flymake SEVERITY to eca one."
+  (pcase severity
+    ('flymake-error "error")
+    (':error "error")
+    ('flymake-warning "warning")
+    (':warning "warning")
+    ('flymake-note "information")
+    (':note "information")
+    (_ "unknown")))
+
 (defun eca-editor--lsp-mode-diagnostics (uri workspace)
-  "Find all lsp-mode diagnostics found for WORKSPACE.
+  "Find all `lsp-mode` diagnostics found for WORKSPACE.
 If URI is nil find all diagnostics otherwise filter to that uri."
   (let* ((eca-diagnostics '())
          (all-diagnostics (car (--keep (when (and (buffer-file-name it)
@@ -64,8 +75,28 @@ If URI is nil find all diagnostics otherwise filter to that uri."
 (defun eca-editor--flymake-diagnostics (_uri _workspace)
   "Find all flymake diagnostics found for WORKSPACE.
 If URI is nil find all diagnostics otherwise filter to that uri."
-  ;; TODO
-  )
+  (with-current-buffer (find-file-noselect workspace)
+    (--map
+     (with-current-buffer (flymake-diagnostic-buffer it)
+       (save-excursion
+         (let ((beg (flymake-diagnostic-beg it))
+               (end (flymake-diagnostic-end it))
+               (beg-line (progn (goto-char beg)
+                                (line-number-at-pos)))
+               (beg-col (current-column))
+               (end-line (progn (goto-char end)
+                                (line-number-at-pos)))
+               (end-col (current-column)))
+           (list :uri (eca--path-to-uri (buffer-file-name (flymake-diagnostic-buffer it)))
+                 :severity (eca-editor--flymake-to-eca-severity (flymake-diagnostic-type it))
+                 :code (flymake-diagnostic-code it)
+                 :range (list :start (list :line beg-line
+                                           :character beg-col)
+                              :end (list :line end-line
+                                         :character end-col))
+                 :source (flymake-diagnostic-backend it)
+                 :message (flymake-diagnostic-text it)))))
+     (flymake--project-diagnostics))))
 
 (defun eca-editor--get-lsp-diagnostics (uri workspaces)
   "Return lsp diagnostics for URI in WORKSPACES.
