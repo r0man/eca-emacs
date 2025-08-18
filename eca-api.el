@@ -171,5 +171,12 @@ Waits until there is no input."
   (let* ((body `(:jsonrpc "2.0" :method ,method :params ,params)))
     (eca-api--send! session body)))
 
+(cl-defun eca-api-send-request-response (session request response)
+  "Send back to server the RESPONSE from REQUEST for SESSION."
+  (let ((body (list :jsonrpc "2.0"
+                    :id (plist-get request :id)
+                    :result response)))
+    (eca-api--send! session body)))
+
 (provide 'eca-api)
 ;;; eca-api.el ends here

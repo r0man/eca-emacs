@@ -127,6 +127,18 @@
                (expand-file-name it)
                (or (file-remote-p it 'localname t) it))))
 
+(defun eca--uri-to-path (uri)
+  "Convert a file URI to a file path."
+  (cond
+   ((string-prefix-p "file:///" uri)
+    (url-unhex-string (substring uri 8)))
+
+   ((string-prefix-p "file://" uri)
+    (url-unhex-string (substring uri 7)))
+
+
+   (t uri)))
+
 (defun eca-info (format &rest args)
   "Display eca info message with FORMAT with ARGS."
   (message "%s :: %s" (propertize "ECA" 'face 'success) (apply #'format format args)))

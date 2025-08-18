@@ -27,6 +27,7 @@
 (require 'eca-api)
 (require 'eca-chat)
 (require 'eca-mcp)
+(require 'eca-editor)
 
 (defgroup eca nil
   "ECA group."
@@ -82,12 +83,15 @@
       ("chat/contentReceived" (eca-chat-content-received session params))
       ("tool/serverUpdated" (eca--tool-server-updated session params))
       ("$/showMessage" (eca--handle-show-message params))
-      (_ (eca-warn "Unknown notification %s" method)))))
+      (_ (eca-warn "Unknown server notification %s" method)))))
 
-(defun eca--handle-server-request (_session _request)
+(defun eca--handle-server-request (session request)
   "Handle REQUEST sent by server for SESSION."
-  ;; TODO
-  )
+  (let ((method (plist-get request :method))
+        (params (plist-get request :params)))
+    (pcase method
+      ("editor/getDiagnostics" (eca-editor-get-diagnostics session params))
+      (_ (eca-warn "Unknown server request %s" method)))))
 
 (defun eca--handle-message (session json-data)
   "Handle raw message JSON-DATA for SESSION."
@@ -104,7 +108,8 @@
                                (cl-remf (eca--session-response-handlers session) id)
                                (funcall error-callback (plist-get json-data :error)))))
           ('notification (eca--handle-server-notification session json-data))
-          ('request (eca--handle-server-request session json-data)))
+          ('request (let ((response (eca--handle-server-request session json-data)))
+                      (eca-api-send-request-response session json-data response))))
       ;; TODO handle errors
       (error nil))))
 
@@ -118,7 +123,8 @@
    :params (list :processId (emacs-pid)
                  :clientInfo (list :name "emacs"
                                    :version (emacs-version))
-                 :capabilities (list :codeAssistant (list :chat t))
+                 :capabilities (list :codeAssistant (list :chat t
+                                                          :editor (list :diagnostics t)))
                  :initializationOptions (list :chatBehavior eca-chat-custom-behavior)
                  :workspaceFolders (vconcat (-map (lambda (folder)
                                                     (list :uri (eca--path-to-uri folder)
