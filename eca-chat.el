@@ -282,8 +282,8 @@ Must be a valid model supported by server, check `eca-chat-select-model`."
 
 (defvar eca-chat-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<backspace>") (lambda (interactive) (eca-chat--key-pressed-deletion (lambda () (delete-char -1)))))
-    (define-key map (kbd "DEL") (lambda (interactive) (eca-chat--key-pressed-deletion (lambda () (delete-char -1)))))
+    (define-key map (kbd "<backspace>") (lambda () (interactive) (eca-chat--key-pressed-deletion (lambda () (delete-char -1)))))
+    (define-key map (kbd "DEL") (lambda () (interactive) (eca-chat--key-pressed-deletion (lambda () (delete-char -1)))))
     (define-key map (kbd "S-<return>") #'eca-chat--key-pressed-newline)
     (define-key map (kbd "C-<up>") #'eca-chat--key-pressed-previous-prompt-history)
     (define-key map (kbd "C-<down>") #'eca-chat--key-pressed-next-prompt-history)
@@ -499,7 +499,8 @@ Otherwise to a not loading state."
 (defun eca-chat--key-pressed-deletion (side-effect-fn)
   "Apply SIDE-EFFECT-FN before point, unless at the prompt or context boundary.
 Checks if it's in a context, removing it if so.
-This is similar to actions like `backward-delete-char' but protects the prompt/context line."
+This is similar to actions like `backward-delete-char' but protects
+the prompt/context line."
   (let* ((cur-ov (car (overlays-in (line-beginning-position) (point))))
          (text (thing-at-point 'symbol))
          (context-item (-some->> text
