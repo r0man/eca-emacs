@@ -532,6 +532,28 @@ the prompt/context line."
 
      (t (funcall side-effect-fn)))))
 
+(defun eca-chat--send-prompt (session prompt)
+  "Send PROMPT to server for SESSION."
+  (eca-chat--with-current-buffer (eca-chat--get-buffer session)
+    (let* ((prompt-start (eca-chat--prompt-field-start-point)))
+      (when (seq-empty-p eca-chat--history) (eca-chat--clear session))
+      (add-to-list 'eca-chat--history prompt)
+      (setq eca-chat--history-index -1)
+      (goto-char prompt-start)
+      (delete-region (point) (point-max))
+      (eca-chat--set-chat-loading session t)
+      (eca-api-request-async
+       session
+       :method "chat/prompt"
+       :params (list :message prompt
+                     :request-id (cl-incf eca-chat--last-request-id)
+                     :chatId eca-chat--id
+                     :model (eca-chat--model session)
+                     :behavior (eca-chat--behavior session)
+                     :contexts (vconcat eca-chat--context))
+       :success-callback (-lambda (res)
+                           (setq-local eca-chat--id (plist-get res :chatId)))))))
+
 (defun eca-chat--key-pressed-return ()
   "Send the current prompt to eca process if in prompt."
   (interactive)
@@ -545,23 +567,7 @@ the prompt/context line."
        ;; check prompt
        ((and (not (string-empty-p prompt))
              (not eca-chat--chat-loading))
-        (when (seq-empty-p eca-chat--history) (eca-chat--clear session))
-        (add-to-list 'eca-chat--history prompt)
-        (setq eca-chat--history-index -1)
-        (goto-char prompt-start)
-        (delete-region (point) (point-max))
-        (eca-chat--set-chat-loading session t)
-        (eca-api-request-async
-         session
-         :method "chat/prompt"
-         :params (list :message prompt
-                       :request-id (cl-incf eca-chat--last-request-id)
-                       :chatId eca-chat--id
-                       :model (eca-chat--model session)
-                       :behavior (eca-chat--behavior session)
-                       :contexts (vconcat eca-chat--context))
-         :success-callback (-lambda (res)
-                             (setq-local eca-chat--id (plist-get res :chatId)))))
+        (eca-chat--send-prompt session prompt))
 
        ;; check it's an actionable text
        ((-some->> (thing-at-point 'symbol) (get-text-property 0 'eca-button-on-action))
@@ -1423,6 +1429,13 @@ if ARG is current prefix, ask for file, otherwise add current file."
       (eca-chat--add-context (list :type "file"
                                    :path path))
       (eca-chat-open (eca-session)))))
+
+;;;###autoload
+(defun eca-chat-send-prompt (prompt)
+  "Send PROMPT to current chat session."
+  (interactive "sPrompt: ")
+  (eca-assert-session-running (eca-session))
+  (eca-chat--send-prompt (eca-session) prompt))
 
 (declare-function whisper-run "ext:whisper" ())
 

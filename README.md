@@ -52,6 +52,7 @@ M-x package-install eca
 - `eca-chat-add-file-context`: Add the current file to chat as context.
 - `eca-keep-all-suggested-changes`: Accept planned edit changes on file.
 - `eca-discard-all-suggested-changes`: Reject planned edit changes on file.
+- `eca-chat-send-prompt`: In case you wanna send prompts programatically in elisp.
 
 ### Variables
 
