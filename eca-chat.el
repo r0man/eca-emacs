@@ -1334,6 +1334,8 @@ If FORCE? decide to OPEN? or not."
   "Select which model to use in the chat from what server supports."
   (interactive)
   (eca-assert-session-running (eca-session))
+  (when eca-chat-custom-model
+    (error (eca-error "The eca-chat-custom-model variable is already set: %s" eca-chat-custom-model)))
   (when-let* ((model (completing-read "Select a model:" (append (eca--session-models (eca-session)) nil) nil t)))
     (setf (eca--session-chat-selected-model (eca-session)) model)))
 
