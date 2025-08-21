@@ -58,7 +58,10 @@ M-x package-install eca
 
 - `eca-extra-args`: customize extra args to server to help debug like `("--verbose")` or `("--log-level" "debug")`.
 - `eca-chat-usage-string-format`: to customize what shows on mode-line for usage like costs and tokens.
-- `eca-chat-position-params`: customize the chat window.
+- `eca-chat-use-side-window`: customize whether chat window is a side-window or a normal buffer.
+- `eca-chat-window-side`: customize the chat window side.
+- `eca-chat-window-width`: customize the chat window width.
+- `eca-chat-window-height`: customize the chat window height.
 
 
 ### Keybindings
