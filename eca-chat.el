@@ -1010,6 +1010,9 @@ If FORCE? decide to OPEN? or not."
   (setq-local eca-chat--history '())
   (setq-local eca-chat--history-index -1)
 
+  ;; Show diff blocks in markdown-mode with colors.
+  (setq-local markdown-fontify-code-blocks-natively t)
+
   (make-local-variable 'completion-at-point-functions)
   (setq-local completion-at-point-functions (list #'eca-chat-completion-at-point))
 
