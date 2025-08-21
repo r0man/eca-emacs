@@ -20,6 +20,7 @@
 (require 'eca-util)
 
 (declare-function lsp-diagnostics "lsp-mode" (current-workspace?))
+(declare-function flymake-diagnostic-code "flymake" (diagnostic))
 
 (defun eca-editor--lsp-to-eca-severity (severity)
   "Convert lsp SEVERITY to eca one."
@@ -72,21 +73,21 @@ If URI is nil find all diagnostics otherwise filter to that uri."
              diagnostics)
     eca-diagnostics))
 
-(defun eca-editor--flymake-diagnostics (_uri _workspace)
+(defun eca-editor--flymake-diagnostics (_uri workspace)
   "Find all flymake diagnostics found for WORKSPACE.
 If URI is nil find all diagnostics otherwise filter to that uri."
   (with-current-buffer (find-file-noselect workspace)
     (--map
      (with-current-buffer (flymake-diagnostic-buffer it)
        (save-excursion
-         (let ((beg (flymake-diagnostic-beg it))
-               (end (flymake-diagnostic-end it))
-               (beg-line (progn (goto-char beg)
-                                (line-number-at-pos)))
-               (beg-col (current-column))
-               (end-line (progn (goto-char end)
-                                (line-number-at-pos)))
-               (end-col (current-column)))
+         (let* ((beg (flymake-diagnostic-beg it))
+                (end (flymake-diagnostic-end it))
+                (beg-line (progn (goto-char beg)
+                                 (line-number-at-pos)))
+                (beg-col (current-column))
+                (end-line (progn (goto-char end)
+                                 (line-number-at-pos)))
+                (end-col (current-column)))
            (list :uri (eca--path-to-uri (buffer-file-name (flymake-diagnostic-buffer it)))
                  :severity (eca-editor--flymake-to-eca-severity (flymake-diagnostic-type it))
                  :code (flymake-diagnostic-code it)

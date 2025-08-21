@@ -999,6 +999,10 @@ If FORCE? decide to OPEN? or not."
         (run-with-idle-timer eca-chat-cursor-context-debounce nil
                              #'eca-chat--track-context-at-point)))
 
+(declare-function evil-delete-backward-word "evil" ())
+(declare-function evil-delete-back-to-indentation "evil" ())
+(defvar-local evil-insert-state-local-map nil)
+
 ;; Public
 
 (define-derived-mode eca-chat-mode markdown-mode "eca-chat"
