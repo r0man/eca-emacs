@@ -1001,7 +1001,6 @@ If FORCE? decide to OPEN? or not."
 
 (declare-function evil-delete-backward-word "evil" ())
 (declare-function evil-delete-back-to-indentation "evil" ())
-(defvar-local evil-insert-state-local-map nil)
 
 ;; Public
 
@@ -1038,6 +1037,7 @@ If FORCE? decide to OPEN? or not."
         (eca-chat--insert-prompt-string)))
 
     (when (featurep 'evil)
+      (make-local-variable 'evil-insert-state-local-map)
       (define-key evil-insert-state-local-map (kbd "C-w") (lambda () (interactive) (eca-chat--key-pressed-deletion (lambda () (evil-delete-backward-word)))))
       (define-key evil-insert-state-local-map (kbd "C-u") (lambda () (interactive) (eca-chat--key-pressed-deletion (lambda () (evil-delete-back-to-indentation))))))
 
