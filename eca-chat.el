@@ -600,7 +600,8 @@ ICON is the name of the Bootstrap icon to display.
 Returns an SVG image suitable for insertion in the header line,
 styled to match the current theme's header-line face."
   (svg-lib-icon icon nil
-                :background (face-background 'header-line nil t)
+                :background (or (face-background 'header-line nil t)
+                                (face-background 'default nil t))
                 :collection "bootstrap"
                 :foreground (face-foreground 'eca-chat-option-key-face nil t)
                 :stroke 0))
