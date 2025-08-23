@@ -1130,6 +1130,7 @@ If FORCE? decide to OPEN? or not."
   "Handle the content received notification with PARAMS for SESSION."
   (let* ((role (plist-get params :role))
          (content (plist-get params :content))
+         (tool (-some-> (plist-get content :name) intern))
          (roots (eca--session-workspace-folders session)))
     (eca-chat--with-current-buffer (eca-chat--get-buffer session)
       (setq-local eca-chat--empty nil)
@@ -1168,114 +1169,14 @@ If FORCE? decide to OPEN? or not."
         ("reasonFinished" (let ((id (plist-get content :id))
                                 (label (propertize "Thoughts" 'font-lock-face 'eca-chat-reason-label-face)))
                             (eca-chat--update-expandable-content id label "" t)))
-        ("toolCallPrepare" (let* ((name (plist-get content :name))
-                                  (origin (plist-get content :origin))
-                                  (argsText (plist-get content :argumentsText))
-                                  (id (plist-get content :id))
-                                  (summary (plist-get content :summary))
-                                  (label (concat (propertize (or summary
-                                                                 (format "Preparing %s tool call: %s"
-                                                                         (if (string= "mcp" origin) "MCP" "ECA")
-                                                                         name))
-                                                             'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                                 " "
-                                                 eca-chat-mcp-tool-call-loading-symbol)))
-                             (if (eca-chat--get-expandable-content id)
-                                 (eca-chat--update-expandable-content id label argsText t)
-                               (eca-chat--add-expandable-content id
-                                                                 label
-                                                                 (eca-chat--content-table
-                                                                  `(("arguments" . ,argsText)))))))
-        ("toolCallRun" (let* ((name (plist-get content :name))
-                              (origin (plist-get content :origin))
-                              (args (plist-get content :arguments))
-                              (id (plist-get content :id))
-                              (manual? (plist-get content :manualApproval))
-                              (details (plist-get content :details))
-                              (summary (plist-get content :summary))
-                              (approvalText (when manual?
-                                              (concat
-                                               " "
-                                               (eca-buttonize
-                                                (propertize "reject" 'font-lock-face 'eca-chat-tool-call-cancel-face)
-                                                (lambda () (eca-api-notify session
-                                                                           :method "chat/toolCallReject"
-                                                                           :params (list :chatId eca-chat--id :toolCallId id))))
-                                               " "
-                                               (eca-buttonize
-                                                (propertize "accept" 'font-lock-face 'eca-chat-tool-call-run-face)
-                                                (lambda () (eca-api-notify session
-                                                                           :method "chat/toolCallApprove"
-                                                                           :params (list :chatId eca-chat--id :toolCallId id))))))))
-                         (if (string= "fileChange" (plist-get details :type))
-                             (eca-chat--update-expandable-content
-                              id
-                              (concat (eca-chat--file-change-details-label details)
-                                      eca-chat-mcp-tool-call-loading-symbol
-                                      approvalText)
-                              (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
-                           (eca-chat--update-expandable-content
-                            id
-                            (concat (propertize (or summary
-                                                    (format "Calling %s tool: %s"
-                                                            (if (string= "mcp" origin) "MCP" "ECA")
-                                                            name))
-                                                'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                    " "
-                                    eca-chat-mcp-tool-call-loading-symbol
-                                    approvalText)
-                            (eca-chat--content-table `(("arguments" . ,args)))))))
-        ("toolCallRejected" (let* ((name (plist-get content :name))
-                                   (origin (plist-get content :origin))
-                                   (args (plist-get content :arguments))
-                                   (details (plist-get content :details))
-                                   (id (plist-get content :id)))
-                              (if (string= "fileChange" (plist-get details :type))
-                                  (eca-chat--update-expandable-content
-                                   id
-                                   (concat (eca-chat--file-change-details-label details)
-                                           eca-chat-mcp-tool-call-error-symbol)
-                                   (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
-                                (eca-chat--update-expandable-content
-                                 id
-                                 (concat (propertize (format "Rejected %s tool: %s"
-                                                             (if (string= "mcp" origin) "MCP" "ECA")
-                                                             name)
-                                                     'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                         " "
-                                         eca-chat-mcp-tool-call-error-symbol)
-                                 (eca-chat--content-table `(("arguments" . ,args)))))))
-        ("toolCalled" (let* ((id (plist-get content :id))
-                             (name (plist-get content :name))
-                             (origin (plist-get content :origin))
-                             (args (plist-get content :arguments))
-                             (outputs (append (plist-get content :outputs) nil))
-                             (summary (plist-get content :summary))
-                             (error? (plist-get content :error))
-                             (output-contents (-reduce-from (lambda (txt output) (concat txt "\n" (plist-get output :text)))
-                                                            ""
-                                                            outputs))
-                             (details (plist-get content :details))
-                             (status-icon (if error?
-                                              eca-chat-mcp-tool-call-error-symbol
-                                            eca-chat-mcp-tool-call-success-symbol)))
-                        (if (string= "fileChange" (plist-get details :type))
-                            (eca-chat--update-expandable-content
-                             id
-                             (concat (eca-chat--file-change-details-label details)
-                                     status-icon)
-                             (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
-                          (eca-chat--update-expandable-content
-                           id
-                           (concat (propertize (or summary
-                                                   (format "Called %s tool: %s"
-                                                           (if (string= "mcp" origin) "MCP" "ECA")
-                                                           name))
-                                               'font-lock-face 'eca-chat-mcp-tool-call-label-face)
-                                   " "
-                                   status-icon)
-                           (eca-chat--content-table `(("Arguments" . ,args)
-                                                      ("Output" . ,output-contents)))))))
+        ("toolCallPrepare"
+         (eca-chat-content-received:tool-call-prepare session tool content))
+        ("toolCallRun"
+         (eca-chat-content-received:tool-call-run session tool content))
+        ("toolCallRejected"
+         (eca-chat-content-received:tool-call-rejected session tool content))
+        ("toolCalled"
+         (eca-chat-content-received:tool-called session tool content))
         ("progress" (pcase (plist-get content :state)
                       ("running" (progn
                                    (unless eca-chat--spinner-timer
@@ -1292,6 +1193,161 @@ If FORCE? decide to OPEN? or not."
                    (setq-local eca-chat--session-tokens (plist-get content :sessionTokens))
                    (setq-local eca-chat--message-cost (plist-get content :messageCost))
                    (setq-local eca-chat--session-cost (plist-get content :sessionCost))))))))
+
+(cl-defgeneric eca-chat-content-received:tool-call-prepare (session tool content)
+  "Handle the tool-call preparation message for SESSION.
+TOOL is a symbol used for method dispatch.  CONTENT is a plist
+as sent by the server, typically containing :id, :name, :origin,
+:argumentsText and :summary.")
+
+(cl-defgeneric eca-chat-content-received:tool-call-rejected (session tool content)
+  "Handle the tool-call rejected message for SESSION.
+TOOL is a symbol used for method dispatch.  CONTENT is a plist
+with information about the rejection; when DETAILS has type
+\"fileChange\" this usually includes a :diff and :path.")
+
+(cl-defgeneric eca-chat-content-received:tool-call-run (session tool content)
+  "Handle the tool-call running message for SESSION.
+TOOL is a symbol used for method dispatch.  CONTENT is a plist
+describing the in-progress call; may include :manualApproval
+requiring user interaction, and optional :details.")
+
+(cl-defgeneric eca-chat-content-received:tool-called (session tool content)
+  "Handle the tool-call finished message for SESSION.
+TOOL is a symbol used for method dispatch.  CONTENT is a plist
+summarizing results or errors and optional DETAILS payload.")
+
+(cl-defmethod eca-chat-content-received:tool-call-prepare (session t content)
+  "Default method for tool-call preparation.
+Create or update an expandable block in the chat showing the
+pending call and its arguments."
+  (let* ((name (plist-get content :name))
+         (origin (plist-get content :origin))
+         (argsText (plist-get content :argumentsText))
+         (id (plist-get content :id))
+         (summary (plist-get content :summary))
+         (label (concat (propertize (or summary
+                                        (format "Preparing %s tool call: %s"
+                                                (if (string= "mcp" origin) "MCP" "ECA")
+                                                name))
+                                    'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                        " "
+                        eca-chat-mcp-tool-call-loading-symbol)))
+    (if (eca-chat--get-expandable-content id)
+        (eca-chat--update-expandable-content id label argsText t)
+      (eca-chat--add-expandable-content id
+                                        label
+                                        (eca-chat--content-table
+                                         `(("arguments" . ,argsText)))))))
+
+(cl-defmethod eca-chat-content-received:tool-call-rejected (session t content)
+  "Default method for tool-call rejection.
+Mark the expandable block as failed and show either a file diff
+when DETAILS has type \"fileChange\", or the call arguments."
+  (let* ((roots (eca--session-workspace-folders session))
+         (name (plist-get content :name))
+         (origin (plist-get content :origin))
+         (args (plist-get content :arguments))
+         (details (plist-get content :details))
+         (id (plist-get content :id)))
+    (if (string= "fileChange" (plist-get details :type))
+        (eca-chat--update-expandable-content
+         id
+         (concat (eca-chat--file-change-details-label details)
+                 eca-chat-mcp-tool-call-error-symbol)
+         (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
+      (eca-chat--update-expandable-content
+       id
+       (concat (propertize (format "Rejected %s tool: %s"
+                                   (if (string= "mcp" origin) "MCP" "ECA")
+                                   name)
+                           'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+               " "
+               eca-chat-mcp-tool-call-error-symbol)
+       (eca-chat--content-table `(("arguments" . ,args)))))))
+
+(cl-defmethod eca-chat-content-received:tool-call-run (session t content)
+  "Default method for tool-call running state.
+Update the expandable block to show a loading state and, when
+manual approval is required, insert Accept/Reject actions.  Show
+a file diff for \"fileChange\" DETAILS."
+  (let* ((roots (eca--session-workspace-folders session))
+         (name (plist-get content :name))
+         (origin (plist-get content :origin))
+         (args (plist-get content :arguments))
+         (id (plist-get content :id))
+         (manual? (plist-get content :manualApproval))
+         (details (plist-get content :details))
+         (summary (plist-get content :summary))
+         (approvalText (when manual?
+                         (concat
+                          " "
+                          (eca-buttonize
+                           (propertize "reject" 'font-lock-face 'eca-chat-tool-call-cancel-face)
+                           (lambda () (eca-api-notify session
+                                                 :method "chat/toolCallReject"
+                                                 :params (list :chatId eca-chat--id :toolCallId id))))
+                          " "
+                          (eca-buttonize
+                           (propertize "accept" 'font-lock-face 'eca-chat-tool-call-run-face)
+                           (lambda () (eca-api-notify session
+                                                 :method "chat/toolCallApprove"
+                                                 :params (list :chatId eca-chat--id :toolCallId id))))))))
+    (if (string= "fileChange" (plist-get details :type))
+        (eca-chat--update-expandable-content
+         id
+         (concat (eca-chat--file-change-details-label details)
+                 eca-chat-mcp-tool-call-loading-symbol
+                 approvalText)
+         (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
+      (eca-chat--update-expandable-content
+       id
+       (concat (propertize (or summary
+                               (format "Calling %s tool: %s"
+                                       (if (string= "mcp" origin) "MCP" "ECA")
+                                       name))
+                           'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+               " "
+               eca-chat-mcp-tool-call-loading-symbol
+               approvalText)
+       (eca-chat--content-table `(("arguments" . ,args)))))))
+
+(cl-defmethod eca-chat-content-received:tool-called (session t content)
+  "Default method for tool-call completion.
+Update the expandable block with success or error status and show
+the output or a file diff for \"fileChange\" DETAILS."
+  (let* ((roots (eca--session-workspace-folders session))
+         (id (plist-get content :id))
+         (name (plist-get content :name))
+         (origin (plist-get content :origin))
+         (args (plist-get content :arguments))
+         (outputs (append (plist-get content :outputs) nil))
+         (summary (plist-get content :summary))
+         (error? (plist-get content :error))
+         (output-contents (-reduce-from (lambda (txt output) (concat txt "\n" (plist-get output :text)))
+                                        ""
+                                        outputs))
+         (details (plist-get content :details))
+         (status-icon (if error?
+                          eca-chat-mcp-tool-call-error-symbol
+                        eca-chat-mcp-tool-call-success-symbol)))
+    (if (string= "fileChange" (plist-get details :type))
+        (eca-chat--update-expandable-content
+         id
+         (concat (eca-chat--file-change-details-label details)
+                 status-icon)
+         (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
+      (eca-chat--update-expandable-content
+       id
+       (concat (propertize (or summary
+                               (format "Called %s tool: %s"
+                                       (if (string= "mcp" origin) "MCP" "ECA")
+                                       name))
+                           'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+               " "
+               status-icon)
+       (eca-chat--content-table `(("Arguments" . ,args)
+                                  ("Output" . ,output-contents)))))))
 
 (defun eca-chat--handle-mcp-server-updated (session _server)
   "Handle mcp SERVER updated for SESSION."
