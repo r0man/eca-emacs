@@ -1210,10 +1210,14 @@ If FORCE? decide to OPEN? or not."
                          (if (string= "fileChange" (plist-get details :type))
                              (eca-chat--update-expandable-content
                               id
-                              (concat (eca-chat--file-change-details-label details)
+                              (concat (propertize summary 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                      " "
+                                      (eca-chat--file-change-details-label details)
                                       eca-chat-mcp-tool-call-loading-symbol
                                       approvalText)
-                              (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
+                              (concat
+                               "Tool: `" name "`\n"
+                               (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots)))
                            (eca-chat--update-expandable-content
                             id
                             (concat (propertize (or summary
@@ -1229,13 +1233,18 @@ If FORCE? decide to OPEN? or not."
                                    (origin (plist-get content :origin))
                                    (args (plist-get content :arguments))
                                    (details (plist-get content :details))
+                                   (summary (plist-get content :summary))
                                    (id (plist-get content :id)))
                               (if (string= "fileChange" (plist-get details :type))
                                   (eca-chat--update-expandable-content
                                    id
-                                   (concat (eca-chat--file-change-details-label details)
+                                   (concat (propertize summary 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                           " "
+                                           (eca-chat--file-change-details-label details)
                                            eca-chat-mcp-tool-call-error-symbol)
-                                   (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
+                                   (concat
+                                    "Tool: `" name "`\n"
+                                    (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots)))
                                 (eca-chat--update-expandable-content
                                  id
                                  (concat (propertize (format "Rejected %s tool: %s"
@@ -1262,9 +1271,13 @@ If FORCE? decide to OPEN? or not."
                         (if (string= "fileChange" (plist-get details :type))
                             (eca-chat--update-expandable-content
                              id
-                             (concat (eca-chat--file-change-details-label details)
+                             (concat (propertize summary 'font-lock-face 'eca-chat-mcp-tool-call-label-face)
+                                     " "
+                                     (eca-chat--file-change-details-label details)
                                      status-icon)
-                             (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots))
+                             (concat
+                              "Tool: `" name "`\n"
+                              (eca-chat--file-change-diff (plist-get details :path) (plist-get details :diff) roots)))
                           (eca-chat--update-expandable-content
                            id
                            (concat (propertize (or summary
